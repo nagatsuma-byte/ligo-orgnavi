@@ -665,16 +665,19 @@ const DATA = [
 ];
 
 // ===== Rank =====
-// 0:社長, 1:部長/マネ, 2:サブマネ, 3:リーダー, 4:メンバー
+// 0:役員/社長, 1:執行役員, 2:部長, 3:グループマネ, 4:マネ, 5:サブマネ, 6:リーダー, 7:メンバー
 // 部署ボックスは親の階層+0.5（上下のランク帯の間に置く）
 function rankOfPerson(role) {
   const r = role || "";
   if (r.includes("社長")) return 0;
-  if (r.includes("部長")) return 1;
-  if (r.includes("マネージャー") && !r.includes("サブ")) return 1;
-  if (r.includes("サブマネージャー")) return 2;
-  if (r.includes("リーダー")) return 3;
-  return 4;
+  if (r === "役員" || (r.includes("役員") && !r.includes("執行"))) return 0;
+  if (r.includes("執行役員")) return 1;
+  if (r.includes("部長")) return 2;
+  if (r.includes("グループマネージャー")) return 3;
+  if (r.includes("マネージャー") && !r.includes("サブ") && !r.includes("グループ")) return 4;
+  if (r.includes("サブマネージャー")) return 5;
+  if (r.includes("リーダー")) return 6;
+  return 7;
 }
 function rankOf(d) {
   if (d.kind === "dept") {
@@ -684,7 +687,7 @@ function rankOf(d) {
   }
   return rankOfPerson(d.role);
 }
-const RANK_LABELS = ["社長", "部長 / マネージャー", "サブマネージャー", "リーダー", "メンバー"];
+const RANK_LABELS = ["役員 / 社長", "執行役員", "部長", "グループマネージャー", "マネージャー", "サブマネージャー", "リーダー", "メンバー"];
 
 // ===== Layout =====
 const NODE_W = 132;
@@ -1063,28 +1066,13 @@ qEl.addEventListener("input", () => {
 
 // ===== Editor =====
 const ROLE_OPTIONS = [
-  "社長",
+  "役員",
+  "執行役員",
   "部長",
-  "部長 / 営業部長",
+  "グループマネージャー",
   "マネージャー",
   "サブマネージャー",
   "リーダー",
-  "CSリーダー",
-  "デジマケ リーダー",
-  "ライター リーダー",
-  "運用 リーダー",
-  "リーダー / CSリーダー",
-  "メンバー",
-  "運用メンバー",
-  "アシスタント",
-  "担当CS",
-  "ユニット未定",
-  "担当未定",
-  "MEO事業部",
-  "HP事業部",
-  "IS",
-  "採用代行",
-  "バックオフィス",
 ];
 const DEPT_OPTIONS = [
   "経営",
@@ -1177,7 +1165,7 @@ function openAddMember() {
   mDelete.style.display = "none";
 
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
-  fillSelect(mRole, roleOpts, "メンバー");
+  fillSelect(mRole, roleOpts, "リーダー");
   // 部署は任意（未設定OK）
   const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
   fillSelect(mDept, deptOpts, "");
