@@ -67,6 +67,25 @@
   .btn:hover { border-color: var(--accent); color: var(--accent); }
   .zoom-label { font-size: 12px; color: var(--sub); min-width: 44px; text-align: center; }
 
+  .view-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .view-toggle button {
+    border: 0;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--sub);
+    font-family: inherit;
+  }
+  .view-toggle button.active { background: var(--accent); color: #fff; }
+
   .canvas-wrap {
     position: relative; overflow: hidden; background: var(--canvas);
     background-image:
@@ -75,6 +94,103 @@
     background-size: 24px 24px;
     cursor: grab;
   }
+  .canvas-wrap.hide { display: none; }
+
+  .list-wrap {
+    overflow: auto;
+    background: var(--bg);
+    padding: 16px;
+  }
+  .list-wrap.hide { display: none; }
+  .list-toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .list-toolbar .filter {
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    font-family: inherit;
+    outline: none;
+  }
+  .list-toolbar .filter:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .list-count { font-size: 12px; color: var(--sub); margin-left: auto; }
+
+  table.member-table {
+    width: 100%;
+    background: #fff;
+    border-collapse: collapse;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    font-size: 13px;
+  }
+  table.member-table thead {
+    background: #f8fafc;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  table.member-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--sub);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  table.member-table th.sort-asc::after { content: " ▲"; font-size: 9px; }
+  table.member-table th.sort-desc::after { content: " ▼"; font-size: 9px; }
+  table.member-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  table.member-table tbody tr:hover { background: #f8fafc; }
+  table.member-table tbody tr.on-leave-row { background: #fafafa; opacity: .8; }
+  table.member-table tbody tr.on-leave-row:hover { opacity: 1; }
+  table.member-table .table-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--accent-soft);
+    display: grid; place-items: center;
+    color: var(--accent-dark);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  table.member-table .table-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  table.member-table .name-cell {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.member-table select.cell-select {
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    max-width: 220px;
+    width: 100%;
+  }
+  table.member-table select.cell-select:hover, table.member-table select.cell-select:focus {
+    border-color: var(--accent);
+    background: #fff;
+  }
+  table.member-table .status-cell select { width: auto; }
+  table.member-table .meta-cell { color: var(--sub); font-size: 11px; }
   .canvas-wrap.panning { cursor: grabbing; }
   .canvas {
     position: absolute; top: 0; left: 0;
@@ -313,11 +429,15 @@
 <div class="app">
   <header>
     <div class="brand">LIGO<span>顔ナビ</span></div>
-    <div class="toolbar">
+    <div class="view-toggle">
+      <button id="vChart" class="active">組織図</button>
+      <button id="vList">リスト</button>
+    </div>
+    <div class="toolbar" id="chartTools">
       <button class="btn" id="btnFit">全体表示</button>
       <button class="btn" id="btnReset">レイアウト初期化</button>
     </div>
-    <div class="toolbar">
+    <div class="toolbar" id="zoomTools">
       <button class="btn" id="btnZoomOut">－</button>
       <span class="zoom-label" id="zoomLabel">100%</span>
       <button class="btn" id="btnZoomIn">＋</button>
@@ -332,6 +452,33 @@
       <svg id="lines"></svg>
     </div>
     <div class="hint">カードをドラッグ＝移動／背景ドラッグ＝全体移動／ホイール＝ズーム／鉛筆アイコン＝編集</div>
+  </div>
+  <div class="list-wrap hide" id="listWrap">
+    <div class="list-toolbar">
+      <select class="filter" id="lfDept"><option value="">すべての部署</option></select>
+      <select class="filter" id="lfStatus">
+        <option value="">すべてのステータス</option>
+        <option value="active">在籍中</option>
+        <option value="産休">産休</option>
+        <option value="育休">育休</option>
+        <option value="休職中">休職中</option>
+      </select>
+      <span class="list-count" id="listCount"></span>
+    </div>
+    <table class="member-table" id="memberTable">
+      <thead>
+        <tr>
+          <th></th>
+          <th data-sort="name">名前</th>
+          <th data-sort="role">役職</th>
+          <th data-sort="dept">部署</th>
+          <th data-sort="parent">所属チーム</th>
+          <th data-sort="status">ステータス</th>
+          <th data-sort="joined">入社／生年</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 </div>
 
@@ -1141,6 +1288,215 @@ function initWithPersist() {
   render();
   fitToView();
 }
+
+// ===== List View =====
+const listWrap = document.getElementById("listWrap");
+const canvasWrap2 = document.getElementById("canvasWrap");
+const vChartBtn = document.getElementById("vChart");
+const vListBtn = document.getElementById("vList");
+const chartTools = document.getElementById("chartTools");
+const zoomTools = document.getElementById("zoomTools");
+const memberTbody = document.querySelector("#memberTable tbody");
+const lfDept = document.getElementById("lfDept");
+const lfStatus = document.getElementById("lfStatus");
+const listCount = document.getElementById("listCount");
+
+let listSort = { key: "rank", dir: "asc" };
+
+function switchView(view) {
+  if (view === "list") {
+    vChartBtn.classList.remove("active");
+    vListBtn.classList.add("active");
+    canvasWrap2.classList.add("hide");
+    listWrap.classList.remove("hide");
+    chartTools.style.display = "none";
+    zoomTools.style.display = "none";
+    renderList();
+  } else {
+    vChartBtn.classList.add("active");
+    vListBtn.classList.remove("active");
+    canvasWrap2.classList.remove("hide");
+    listWrap.classList.add("hide");
+    chartTools.style.display = "";
+    zoomTools.style.display = "";
+  }
+}
+
+vChartBtn.addEventListener("click", () => switchView("chart"));
+vListBtn.addEventListener("click", () => switchView("list"));
+
+function buildDeptFilterOptions() {
+  const depts = new Set();
+  for (const d of Object.values(STATE.byId)) {
+    if (d.kind === "person" && d.dept) depts.add(d.dept);
+  }
+  const current = lfDept.value;
+  lfDept.innerHTML = '<option value="">すべての部署</option>' +
+    [...depts].sort().map(d => `<option value="${d}">${d}</option>`).join("");
+  lfDept.value = current;
+}
+
+function parentLabel(parentId) {
+  if (!parentId) return "（なし）";
+  const p = STATE.byId[parentId];
+  if (!p) return "（不明）";
+  return p.kind === "dept" ? `[部署] ${p.name}` : `${p.name}（${p.role}）`;
+}
+
+function statusBadgeHTML(s) {
+  if (!s || s === "active") return '<span style="color:#22c55e;font-size:11px">● 在籍中</span>';
+  const colors = {
+    "産休": ["#fce7f3", "#9d174d"],
+    "育休": ["#dbeafe", "#1e3a8a"],
+    "休職中": ["#f3f4f6", "#374151"],
+  };
+  const [bg, fg] = colors[s] || ["#fef3c7", "#92400e"];
+  return `<span style="background:${bg};color:${fg};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${s}</span>`;
+}
+
+function compareMembers(a, b, key, dir) {
+  let av, bv;
+  if (key === "name") { av = a.name; bv = b.name; }
+  else if (key === "role") { av = a.role || ""; bv = b.role || ""; }
+  else if (key === "dept") { av = a.dept || ""; bv = b.dept || ""; }
+  else if (key === "parent") { av = parentLabel(a.parent); bv = parentLabel(b.parent); }
+  else if (key === "status") { av = a.status || "active"; bv = b.status || "active"; }
+  else if (key === "joined") { av = a.joined || ""; bv = b.joined || ""; }
+  else if (key === "rank") {
+    const ra = rankOfPerson(a.role), rb = rankOfPerson(b.role);
+    if (ra !== rb) return (ra - rb) * (dir === "asc" ? 1 : -1);
+    av = a.name; bv = b.name;
+  }
+  const r = String(av).localeCompare(String(bv), "ja");
+  return dir === "asc" ? r : -r;
+}
+
+function renderList() {
+  buildDeptFilterOptions();
+  const q = qEl.value.trim().toLowerCase();
+  const fd = lfDept.value;
+  const fs = lfStatus.value;
+  let members = Object.values(STATE.byId).filter(d => d.kind === "person");
+  members = members.filter(d => {
+    if (fd && d.dept !== fd) return false;
+    if (fs && (d.status || "active") !== fs) return false;
+    if (!q) return true;
+    const hay = [d.name, d.role, d.dept, d.joined, d.birth].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+  members.sort((a, b) => compareMembers(a, b, listSort.key, listSort.dir));
+  listCount.textContent = `${members.length}人 / 合計${Object.values(STATE.byId).filter(d => d.kind === "person").length}人`;
+
+  // sort indicator
+  document.querySelectorAll("#memberTable th[data-sort]").forEach(th => {
+    th.classList.remove("sort-asc", "sort-desc");
+    if (th.dataset.sort === listSort.key) th.classList.add(`sort-${listSort.dir}`);
+  });
+
+  // Build options once
+  const banned = new Set(); // for global use - we filter per-row below
+  const roleOptionsHTML = ROLE_OPTIONS.map(r => `<option value="${r}">${r}</option>`).join("");
+  const deptOptionsHTML = DEPT_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
+  const statusOptionsHTML = `<option value="active">在籍中</option><option value="産休">産休</option><option value="育休">育休</option><option value="休職中">休職中</option>`;
+
+  // Parent options (people + depts, sorted)
+  const personOpts = Object.values(STATE.byId)
+    .filter(d => d.kind === "person")
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
+    .map(d => ({ id: d.id, label: `${d.name}（${d.role}）` }));
+  const deptOpts = Object.values(STATE.byId)
+    .filter(d => d.kind === "dept")
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
+    .map(d => ({ id: d.id, label: `[部署] ${d.name}` }));
+
+  memberTbody.innerHTML = "";
+  for (const m of members) {
+    const tr = document.createElement("tr");
+    if (m.status && m.status !== "active") tr.classList.add("on-leave-row");
+    tr.dataset.id = m.id;
+
+    // Parent options exclude self + descendants
+    const desc = descendantIds(m.id);
+    desc.add(m.id);
+    const parentHTML = '<option value="">（なし／ルート）</option>' +
+      [...personOpts, ...deptOpts]
+        .filter(o => !desc.has(o.id))
+        .map(o => `<option value="${o.id}">${o.label}</option>`)
+        .join("");
+
+    tr.innerHTML = `
+      <td>
+        <div class="table-avatar">
+          <img src="${faceImgSrc(m.id)}" onerror="this.style.display='none'">
+          <span style="position:relative;z-index:-1">${m.name[0]}</span>
+        </div>
+      </td>
+      <td class="name-cell">${m.name}</td>
+      <td><select class="cell-select" data-field="role">${roleOptionsHTML}</select></td>
+      <td><select class="cell-select" data-field="dept">${deptOptionsHTML}</select></td>
+      <td><select class="cell-select" data-field="parent">${parentHTML}</select></td>
+      <td class="status-cell"><select class="cell-select" data-field="status">${statusOptionsHTML}</select></td>
+      <td class="meta-cell">${m.joined || ""}${m.birth ? "<br>" + m.birth : ""}</td>
+    `;
+    // Set select values; if not in list, add as a custom option
+    const setSel = (field, value) => {
+      const sel = tr.querySelector(`select[data-field="${field}"]`);
+      let found = false;
+      for (const opt of sel.options) {
+        if (opt.value === value) { opt.selected = true; found = true; break; }
+      }
+      if (!found && value) {
+        const o = document.createElement("option");
+        o.value = value;
+        o.textContent = value + " (現在)";
+        o.selected = true;
+        sel.insertBefore(o, sel.firstChild);
+      }
+    };
+    setSel("role", m.role);
+    setSel("dept", m.dept);
+    setSel("parent", m.parent || "");
+    setSel("status", m.status || "active");
+
+    // Live edit handlers
+    tr.querySelectorAll("select.cell-select").forEach(sel => {
+      sel.addEventListener("change", () => {
+        const field = sel.dataset.field;
+        if (field === "parent") m.parent = sel.value || null;
+        else if (field === "status") m.status = sel.value;
+        else m[field] = sel.value;
+        rebuildTree();
+        autoLayout(STATE.roots);
+        // Re-render chart in the background, persist
+        render();
+        persist();
+        // Refresh row visual (on-leave)
+        if (m.status && m.status !== "active") tr.classList.add("on-leave-row");
+        else tr.classList.remove("on-leave-row");
+      });
+    });
+
+    memberTbody.appendChild(tr);
+  }
+}
+
+// Sort by column click
+document.querySelectorAll("#memberTable th[data-sort]").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (listSort.key === key) listSort.dir = listSort.dir === "asc" ? "desc" : "asc";
+    else { listSort.key = key; listSort.dir = "asc"; }
+    renderList();
+  });
+});
+
+lfDept.addEventListener("change", renderList);
+lfStatus.addEventListener("change", renderList);
+// Also refresh list when search changes (search input already triggers chart dim)
+const oldQInput = qEl.oninput;
+qEl.addEventListener("input", () => {
+  if (!listWrap.classList.contains("hide")) renderList();
+});
 
 initWithPersist();
 </script>
