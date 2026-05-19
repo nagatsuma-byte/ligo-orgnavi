@@ -1163,7 +1163,7 @@ function openAddMember() {
   editingId = null;
   pendingFaceSrc = null;
   mName.textContent = "新規メンバー追加";
-  mSub.textContent = "在籍に必要な情報を入力してください";
+  mSub.textContent = "名前と役職だけでも追加できます";
   mAvatar.innerHTML = "<span>＋</span>";
   // Show all fields including name + photo + joined + birth
   mNameInputWrap.style.display = "block";
@@ -1178,8 +1178,9 @@ function openAddMember() {
 
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, "メンバー");
-  const deptOpts = DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }));
-  fillSelect(mDept, deptOpts, "営業CS");
+  // 部署は任意（未設定OK）
+  const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
+  fillSelect(mDept, deptOpts, "");
   const parentOpts = [{ value: "", label: "（なし／ルート）" }];
   const groups = { person: [], dept: [] };
   for (const k of Object.keys(STATE.byId)) {
@@ -1232,9 +1233,9 @@ function openEditor(id) {
   // role select
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, d.role);
-  // dept select
-  const deptOpts = DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }));
-  fillSelect(mDept, deptOpts, d.dept);
+  // dept select (任意)
+  const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
+  fillSelect(mDept, deptOpts, d.dept || "");
   // parent select: exclude self + descendants
   const banned = descendantIds(id);
   banned.add(id);
@@ -1556,7 +1557,7 @@ function renderList() {
   // Build options once
   const banned = new Set(); // for global use - we filter per-row below
   const roleOptionsHTML = ROLE_OPTIONS.map(r => `<option value="${r}">${r}</option>`).join("");
-  const deptOptionsHTML = DEPT_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
+  const deptOptionsHTML = '<option value="">（未設定）</option>' + DEPT_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
   const statusOptionsHTML = `<option value="active">在籍中</option><option value="産休">産休</option><option value="育休">育休</option><option value="休職中">休職中</option>`;
 
   // Parent options (people + depts, sorted)
