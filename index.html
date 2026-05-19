@@ -169,6 +169,35 @@
   }
   .node.dept-rect .dept-title { font-size: 13px; font-weight: 700; text-align: center; }
   .node.dept-rect .dept-sub { font-size: 10px; text-align: center; opacity: .85; margin-top: 2px; }
+  .status-badge {
+    position: absolute;
+    top: 4px; left: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+    z-index: 5;
+    letter-spacing: .02em;
+  }
+  .status-badge.sankyu { background: #fce7f3; color: #9d174d; border-color: #f9a8d4; }
+  .status-badge.ikukyu { background: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+  .status-badge.kyushoku { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+  .node.on-leave { opacity: .85; }
+  .node.on-leave:hover { opacity: 1; }
+  .leave-section-label {
+    position: absolute;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--sub);
+    background: rgba(255,255,255,.95);
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px dashed var(--line);
+    pointer-events: none;
+  }
   .hint {
     position: absolute;
     bottom: 12px; left: 12px;
@@ -323,6 +352,14 @@
     <label>所属チーム（上司／部署）</label>
     <select id="mParent"></select>
 
+    <label>ステータス</label>
+    <select id="mStatus">
+      <option value="active">在籍中</option>
+      <option value="産休">産休</option>
+      <option value="育休">育休</option>
+      <option value="休職中">休職中</option>
+    </select>
+
     <div class="modal-buttons">
       <button class="btn" id="mCancel">キャンセル</button>
       <button class="btn primary" id="mSave">保存</button>
@@ -334,7 +371,8 @@
 // ===== Data =====
 // face: {p:pageNum, x:cx, y:cy} — coords in original 3000x1688 page image. omit if no photo
 const N = (id, name, role, dept, joined, birth, parent, face) => ({
-  id, kind: "person", name, role, dept, joined, birth, parent, face
+  id, kind: "person", name, role, dept, joined, birth, parent, face,
+  status: "active"  // active | 産休 | 育休 | 休職中
 });
 const D = (id, title, sub, parent) => ({ id, kind: "dept", name: title, role: sub, parent });
 
@@ -548,13 +586,17 @@ function autoLayout(roots) {
     cursor.x += H_GAP * 3;
   }
   // Two-pass Y assignment:
-  // 1) persons at strict rank rows
-  // 2) dept boxes positioned just below parent (between rank rows)
+  // 1) persons at strict rank rows (active only)
+  // 2) dept boxes positioned just below parent
+  // 3) on-leave members at bottom in a separate row
+  let maxActiveY = 0;
   for (const d of Object.values(STATE.byId)) {
     if (d.kind === "person") {
+      if (d.status && d.status !== "active") continue; // handled below
       const baseY = rankOfPerson(d.role) * (NODE_H_PERSON + RANK_GAP);
       const rowOffset = (d.gridRow || 0) * (NODE_H_PERSON + LEAF_ROW_GAP);
       d.y = baseY + rowOffset;
+      maxActiveY = Math.max(maxActiveY, d.y + NODE_H_PERSON);
     }
   }
   for (const d of Object.values(STATE.byId)) {
@@ -562,7 +604,25 @@ function autoLayout(roots) {
       const parent = STATE.byId[d.parent];
       const parentH = parent ? (parent.kind === "dept" ? NODE_H_DEPT : NODE_H_PERSON) : NODE_H_PERSON;
       d.y = (parent ? parent.y : 0) + parentH + 24;
+      maxActiveY = Math.max(maxActiveY, d.y + NODE_H_DEPT);
     }
+  }
+  // Lay out leave members at bottom, grouped by status
+  const leaveMembers = Object.values(STATE.byId).filter(d => d.kind === "person" && d.status && d.status !== "active");
+  if (leaveMembers.length > 0) {
+    const order = { "産休": 0, "育休": 1, "休職中": 2 };
+    leaveMembers.sort((a, b) => (order[a.status] - order[b.status]) || a.name.localeCompare(b.name));
+    const leaveY = maxActiveY + 80; // gap below active org
+    let x = 0;
+    for (const d of leaveMembers) {
+      d.x = x;
+      d.y = leaveY;
+      x += NODE_W + H_GAP;
+    }
+    STATE.leaveSectionY = leaveY;
+    STATE.leaveSectionX = -50;
+  } else {
+    STATE.leaveSectionY = null;
   }
 }
 
@@ -631,8 +691,13 @@ function render() {
     if (d.kind === "person") {
       const avStyle = `background:${avatarColor(d.name)};color:${avatarInk(d.name)};`;
       const imgTag = `<img src="${faceImgSrc(d.id)}" alt="" onerror="this.style.display='none'">`;
+      const statusCls = { "産休": "sankyu", "育休": "ikukyu", "休職中": "kyushoku" }[d.status] || "";
+      const statusBadge = (d.status && d.status !== "active")
+        ? `<div class="status-badge ${statusCls}">${d.status}</div>` : "";
+      if (d.status && d.status !== "active") el.classList.add("on-leave");
       el.innerHTML = `
         <button class="edit-btn" data-edit="${d.id}" title="編集">✎</button>
+        ${statusBadge}
         <div class="avatar" style="${avStyle}">${imgTag}<span style="position:relative;z-index:-1">${d.name[0]}</span></div>
         <div class="node-role">${d.role}</div>
         <div class="node-name">${d.name}</div>
@@ -651,6 +716,15 @@ function render() {
     canvas.appendChild(el);
     STATE.nodeEls.set(d.id, el);
   }
+  // Leave-section label
+  if (STATE.leaveSectionY != null) {
+    const label = document.createElement("div");
+    label.className = "leave-section-label";
+    label.textContent = "🌸 産休・育休・休職中";
+    label.style.left = (STATE.leaveSectionX || 0) + "px";
+    label.style.top = (STATE.leaveSectionY - 40) + "px";
+    canvas.appendChild(label);
+  }
   drawLines();
   updateBounds();
 }
@@ -659,6 +733,8 @@ function drawLines() {
   let svg = "";
   for (const d of Object.values(STATE.byId)) {
     if (!d.parent) continue;
+    // skip lines for on-leave members (they're in a separate section)
+    if (d.kind === "person" && d.status && d.status !== "active") continue;
     const p = STATE.byId[d.parent];
     if (!p) continue;
     const x1 = p.x + NODE_W / 2;
@@ -857,6 +933,7 @@ const mSub = document.getElementById("mSub");
 const mRole = document.getElementById("mRole");
 const mDept = document.getElementById("mDept");
 const mParent = document.getElementById("mParent");
+const mStatus = document.getElementById("mStatus");
 const mSave = document.getElementById("mSave");
 const mCancel = document.getElementById("mCancel");
 
@@ -939,8 +1016,15 @@ function openEditor(id) {
 
   fillSelect(mParent, parentOpts, d.parent || "");
 
-  // Hide dept select if this is a dept node
-  mDept.parentElement.style.display = d.kind === "dept" ? "none" : "block";
+  // Toggle field visibility (hide label + select together)
+  const setField = (sel, visible) => {
+    sel.style.display = visible ? "block" : "none";
+    const lab = sel.previousElementSibling;
+    if (lab && lab.tagName === "LABEL") lab.style.display = visible ? "block" : "none";
+  };
+  setField(mDept, d.kind === "person");
+  setField(mStatus, d.kind === "person");
+  if (d.kind === "person") mStatus.value = d.status || "active";
 
   modalBg.classList.add("show");
   setTimeout(() => mRole.focus(), 50);
@@ -955,7 +1039,10 @@ mSave.addEventListener("click", () => {
   if (!editingId) return;
   const d = STATE.byId[editingId];
   d.role = mRole.value;
-  if (d.kind === "person") d.dept = mDept.value;
+  if (d.kind === "person") {
+    d.dept = mDept.value;
+    d.status = mStatus.value;
+  }
   d.parent = mParent.value || null;
   // Re-build tree (children arrays) and layout
   rebuildTree();
@@ -999,6 +1086,7 @@ function persist() {
       role: n.role,
       dept: n.dept,
       parent: n.parent,
+      status: n.status,
       x: n.x,
       y: n.y,
     };
@@ -1017,6 +1105,7 @@ function loadPersisted() {
       STATE.byId[id].role = saved.role;
       STATE.byId[id].dept = saved.dept;
       STATE.byId[id].parent = saved.parent;
+      if (saved.status) STATE.byId[id].status = saved.status;
       if (typeof saved.x === "number") STATE.byId[id].x = saved.x;
       if (typeof saved.y === "number") STATE.byId[id].y = saved.y;
     }
