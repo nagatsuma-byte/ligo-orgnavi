@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LIGO 顔ナビ</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --canvas: #f1f5f9;
+    --panel: #ffffff;
+    --line: #e6ebf2;
+    --ink: #0f172a;
+    --sub: #64748b;
+    --accent: #06b6d4;
+    --accent-soft: #cffafe;
+    --accent-dark: #0e7490;
+    --shadow: 0 1px 2px rgba(15,23,42,.05), 0 4px 12px rgba(15,23,42,.08);
+    --shadow-hover: 0 4px 12px rgba(15,23,42,.1), 0 12px 32px rgba(6,182,212,.18);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--line);
+    background: #fff; z-index: 10;
+  }
+  .brand { font-weight: 700; color: var(--accent); letter-spacing: .04em; }
+  .brand span { color: var(--ink); font-weight: 600; margin-left: 6px; }
+  .rank-legend {
+    display: flex; gap: 6px;
+    font-size: 11px;
+    color: var(--sub);
+    align-items: center;
+  }
+  .rank-legend .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); margin-right: 4px;
+  }
+  .search { position: relative; margin-left: auto; width: 260px; }
+  .search input {
+    width: 100%; padding: 7px 12px 7px 32px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 13px; outline: none; background: #fff;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--sub); }
+  .toolbar { display: flex; gap: 6px; }
+  .btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    font-size: 12px; padding: 6px 10px; border-radius: 6px;
+    cursor: pointer; transition: all .12s; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .zoom-label { font-size: 12px; color: var(--sub); min-width: 44px; text-align: center; }
+
+  .canvas-wrap {
+    position: relative; overflow: hidden; background: var(--canvas);
+    background-image:
+      linear-gradient(to right, rgba(15,23,42,.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15,23,42,.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+    cursor: grab;
+  }
+  .canvas-wrap.panning { cursor: grabbing; }
+  .canvas {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0; will-change: transform;
+  }
+  .canvas svg {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none; overflow: visible;
+  }
+  .rank-band {
+    position: absolute;
+    left: 0;
+    height: 130px;
+    background: rgba(6,182,212,.04);
+    border-top: 1px dashed rgba(6,182,212,.25);
+    border-bottom: 1px dashed rgba(6,182,212,.25);
+    pointer-events: none;
+  }
+  .rank-band-label {
+    position: absolute;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    background: rgba(255,255,255,.95);
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .node {
+    position: absolute;
+    width: 132px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: var(--shadow);
+    border: 1.5px solid transparent;
+    cursor: grab;
+    user-select: none;
+    transition: box-shadow .12s, border-color .12s;
+    text-align: center;
+  }
+  .node:hover { box-shadow: var(--shadow-hover); border-color: var(--accent-soft); }
+  .node.dragging {
+    cursor: grabbing;
+    box-shadow: 0 8px 24px rgba(6,182,212,.4);
+    border-color: var(--accent);
+    z-index: 100;
+  }
+  .node.dim { opacity: .22; }
+  .node.match { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-hover); }
+  .avatar {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    margin: 0 auto 4px;
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 20px;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px var(--accent-soft);
+    overflow: hidden;
+    position: relative;
+  }
+  .avatar img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+  }
+  .node-role {
+    font-size: 10px;
+    color: var(--accent-dark);
+    background: var(--accent-soft);
+    border-radius: 4px;
+    padding: 1px 6px;
+    display: inline-block;
+    margin-bottom: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .node-name { font-size: 13px; font-weight: 700; line-height: 1.2; margin-bottom: 2px; }
+  .node-meta { font-size: 10px; color: var(--sub); line-height: 1.3; }
+  .node.dept-rect {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+    color: #fff;
+    width: 132px;
+    padding: 8px 10px;
+    min-height: 56px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .node.dept-rect .dept-title { font-size: 13px; font-weight: 700; text-align: center; }
+  .node.dept-rect .dept-sub { font-size: 10px; text-align: center; opacity: .85; margin-top: 2px; }
+  .hint {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    background: rgba(15,23,42,.7);
+    color: #fff; font-size: 11px;
+    padding: 6px 10px; border-radius: 6px;
+    pointer-events: none; z-index: 50;
+  }
+  .edit-btn {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.95);
+    border: 1px solid var(--line);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--sub);
+    font-size: 12px;
+    line-height: 1;
+    z-index: 10;
+  }
+  .node:hover .edit-btn { display: flex; }
+  .edit-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    width: 380px;
+    max-width: calc(100vw - 40px);
+    box-shadow: 0 20px 50px rgba(0,0,0,.2);
+  }
+  .modal h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal h3 .av {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--accent-soft);
+    display: grid; place-items: center;
+    color: var(--accent-dark);
+    font-weight: 700;
+  }
+  .modal h3 .av img { width: 100%; height: 100%; object-fit: cover; }
+  .modal .modal-sub {
+    color: var(--sub);
+    font-size: 12px;
+    margin-bottom: 18px;
+    margin-left: 46px;
+  }
+  .modal label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sub);
+    margin-top: 14px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .modal select, .modal input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+    background: #fff;
+    font-family: inherit;
+    outline: none;
+  }
+  .modal select:focus, .modal input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .modal-buttons {
+    margin-top: 22px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .modal-buttons .btn { padding: 8px 14px; }
+  .modal-buttons .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .modal-buttons .btn.primary:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">LIGO<span>顔ナビ</span></div>
+    <div class="toolbar">
+      <button class="btn" id="btnFit">全体表示</button>
+      <button class="btn" id="btnReset">レイアウト初期化</button>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnZoomOut">－</button>
+      <span class="zoom-label" id="zoomLabel">100%</span>
+      <button class="btn" id="btnZoomIn">＋</button>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="名前・部署・役職で検索" />
+    </div>
+  </header>
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas" id="canvas">
+      <svg id="lines"></svg>
+    </div>
+    <div class="hint">カードをドラッグ＝移動／背景ドラッグ＝全体移動／ホイール＝ズーム／鉛筆アイコン＝編集</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>
+      <span class="av" id="mAvatar"></span>
+      <span id="mName"></span>
+    </h3>
+    <div class="modal-sub" id="mSub"></div>
+
+    <label>役職</label>
+    <select id="mRole"></select>
+
+    <label>部署</label>
+    <select id="mDept"></select>
+
+    <label>所属チーム（上司／部署）</label>
+    <select id="mParent"></select>
+
+    <div class="modal-buttons">
+      <button class="btn" id="mCancel">キャンセル</button>
+      <button class="btn primary" id="mSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Data =====
+// face: {p:pageNum, x:cx, y:cy} — coords in original 3000x1688 page image. omit if no photo
+const N = (id, name, role, dept, joined, birth, parent, face) => ({
+  id, kind: "person", name, role, dept, joined, birth, parent, face
+});
+const D = (id, title, sub, parent) => ({ id, kind: "dept", name: title, role: sub, parent });
+
+const DATA = [
+  N("nagatsuma", "長妻潤", "社長", "経営", "2020年1月設立", "1982年生まれ", null,
+    { p:1, x:1430, y:290 }),
+
+  N("toyoda_r", "豊田梨子", "部長 / 営業部長", "営業部", "2022年6月入社", "1992年生まれ", "nagatsuma",
+    { p:1, x:1430, y:510 }),
+  N("nagahama", "長濱絵梨佳", "マネージャー", "運用", "2021年10月入社", "1986年生まれ", "nagatsuma",
+    { p:1, x:1430, y:735 }),
+  N("aima",     "相間雄仁", "サブマネージャー", "ハコプロ", "2020年入社", "1997年生まれ", "nagatsuma",
+    { p:1, x:330, y:1060 }),
+
+  D("dept_cs",     "営業CS",  "Sales & CS",            "toyoda_r"),
+  D("dept_dm",     "デジマケ", "Digital Marketing",    "toyoda_r"),
+  D("dept_writer", "ライター", "Writer",               "nagahama"),
+  D("dept_unyo",   "運用",    "Operations",           "nagahama"),
+  D("dept_hako",   "ハコプロ", "Hako-Pro",             "aima"),
+  D("dept_is",     "インサイドセールス", "IS",          "nagatsuma"),
+  D("dept_saiyo",  "採用代行", "Recruiting Agency",    "nagatsuma"),
+  D("dept_bo",     "バックオフィス", "Back Office",    "nagatsuma"),
+
+  N("kimura",   "木村亮介", "サブマネージャー", "営業CS", "2023年6月入社", "1990年生まれ", "dept_cs",
+    { p:1, x:970, y:1060 }),
+  N("toyoda_t", "豊田剛史", "サブマネージャー", "営業CS", "2023年10月入社", "1992年生まれ", "dept_cs",
+    { p:1, x:1610, y:1060 }),
+
+  N("kodama",   "小玉一華", "CSリーダー", "営業CS", "2021年7月入社", "", "kimura",
+    { p:1, x:200, y:1365 }),
+  N("katayama", "片山愛",   "CSリーダー", "営業CS", "2025年11月入社", "1998年生まれ", "kimura",
+    { p:3, x:2275, y:80 }),
+  N("okada",    "岡田明日香", "担当CS", "営業CS", "2024年7月入社", "1997年生まれ", "kimura",
+    { p:3, x:1280, y:215 }),
+  N("kataoka",  "片岡仙花", "担当CS", "営業CS", "2018年入社", "1985年生まれ", "kimura",
+    { p:3, x:1280, y:295 }),
+
+  N("watanabe", "渡辺優衣", "CSリーダー", "営業CS", "2024年4月入社", "1991年生まれ", "toyoda_t",
+    { p:3, x:1610, y:460 }),
+  N("kubota",   "久保田美帆", "CSリーダー", "営業CS", "2024年7月入社", "1993年生まれ", "toyoda_t",
+    { p:3, x:1900, y:460 }),
+  N("nishiyama", "西山友里恵", "CSリーダー", "営業CS", "2024年1月入社", "1993年生まれ", "toyoda_t",
+    { p:3, x:2210, y:460 }),
+  N("yukizawa", "行澤瑞貴", "担当CS", "営業CS", "2024年9月入社", "", "toyoda_t",
+    { p:3, x:1610, y:555 }),
+  N("yamauchi", "山内七海", "担当CS", "営業CS", "2024年4月入社", "", "toyoda_t",
+    { p:3, x:1900, y:555 }),
+  N("kagawa",   "香川凜",   "担当CS", "営業CS", "2024年11月入社", "1987年生まれ", "toyoda_t",
+    { p:3, x:1280, y:720 }),
+  N("nihei",    "二瓶英聖", "担当CS", "営業CS", "2024年12月入社", "", "toyoda_t", null),
+  N("maki",     "牧岐風",   "担当CS", "営業CS", "2025年8月入社", "1994年生まれ", "toyoda_t",
+    { p:3, x:1280, y:805 }),
+  N("nagata",   "永田賢治子", "担当CS", "営業CS", "2025年11月入社", "1993年生まれ", "toyoda_t",
+    { p:3, x:1610, y:805 }),
+  N("ito",      "伊藤友耶", "担当CS", "営業CS", "2025年11月入社", "", "toyoda_t",
+    { p:3, x:1280, y:880 }),
+  N("hashimoto_n", "橋本菜乃香", "ユニット未定", "営業CS", "2026年5月入社", "2002年生まれ", "dept_cs", null),
+  N("katsuragi", "葛城えり", "ユニット未定", "営業CS", "2026年5月入社", "1990年生まれ", "dept_cs",
+    { p:3, x:1300, y:1140 }),
+  N("hashimoto_k", "橋本香太", "担当未定", "営業CS", "2026年5月入社", "1993年生まれ", "dept_cs",
+    { p:3, x:2510, y:1140 }),
+
+  N("shono",    "正野光勇太", "デジマケ リーダー", "デジマケ", "2023年2月入社", "1999年生まれ", "dept_dm",
+    { p:1, x:625, y:1365 }),
+  N("hori",     "堀香関",     "MEO事業部",       "デジマケ", "2025年2月入社", "1999年生まれ", "shono",
+    { p:4, x:2440, y:240 }),
+  N("ogawa",    "小川沙織",   "HP事業部",         "デジマケ", "2024年3月入社", "1994年生まれ", "shono",
+    { p:4, x:2440, y:700 }),
+  N("ikeshita", "池下豪史",   "HP事業部",         "デジマケ", "2026年3月入社", "1980年生まれ", "shono", null),
+
+  N("kameda",   "亀田知佳", "ライター リーダー", "ライター", "2023年10月", "1991年生まれ", "dept_writer",
+    { p:1, x:1050, y:1365 }),
+  N("sekine",   "関根由香里", "メンバー", "ライター", "2021年12月入社", "1991年生まれ", "kameda",
+    { p:5, x:1140, y:320 }),
+  N("sato_a",   "佐藤愛美", "メンバー", "ライター", "2025年4月入社", "1981年生まれ", "kameda", null),
+  N("takahashi_r", "高橋梨子", "メンバー", "ライター", "2026年3月入社", "1994年生まれ", "kameda", null),
+
+  N("ono",      "小野美咲", "サブマネージャー", "運用", "2021年8月入社", "1988年生まれ", "dept_unyo",
+    { p:1, x:2255, y:1060 }),
+  N("mitsuno",  "光野望",   "運用 リーダー", "運用", "2023年12月入社", "1993年生まれ", "ono",
+    { p:1, x:1475, y:1365 }),
+  N("matsumura", "松村晃希", "運用 リーダー", "運用", "2024年1月入社", "1995年生まれ", "ono",
+    { p:1, x:2330, y:1365 }),
+  N("shimizu_a", "清水愛梨", "運用メンバー", "運用", "2022年7月入社", "1989年生まれ", "mitsuno",
+    { p:2, x:1900, y:365 }),
+  N("kamata",    "蒲田沙織理", "運用メンバー", "運用", "2023年7月入社", "1986年生まれ", "mitsuno",
+    { p:2, x:1900, y:500 }),
+  N("shimizu_y", "清水優香", "運用メンバー", "運用", "2024年1月入社", "1987年生まれ", "mitsuno",
+    { p:2, x:1900, y:635 }),
+  N("sakamaki",  "坂牧愛美", "運用メンバー", "運用", "2024年7月入社", "1994年生まれ", "matsumura",
+    { p:2, x:1900, y:770 }),
+  N("hashimoto_a", "橋本愛瑠", "運用メンバー", "運用", "2025年5月入社", "2001年生まれ", "matsumura",
+    { p:2, x:1900, y:895 }),
+  N("noto",      "能登由利加", "運用メンバー", "運用", "2025年5月入社", "", "matsumura", null),
+  N("takahashi_m", "高橋真奈", "運用メンバー", "運用", "2025年10月入社", "1999年生まれ", "matsumura",
+    { p:2, x:2330, y:500 }),
+  N("mugikura",  "麦倉香織理", "運用メンバー", "運用", "2025年12月入社", "", "matsumura", null),
+  N("inaho",     "稲穂清香", "アシスタント", "運用", "2021年8月入社", "1995年生まれ", "ono", null),
+  N("okamoto",   "岡本遥加", "アシスタント", "運用", "2023年5月入社", "1990年生まれ", "ono",
+    { p:2, x:1900, y:1300 }),
+
+  N("fujishiro", "藤代実希", "メンバー", "ハコプロ", "2020年11月入社", "1989年生まれ", "dept_hako",
+    { p:6, x:1830, y:615 }),
+
+  N("martinez",  "マルティネス美由紀", "IS", "インサイドセールス", "2025年11月入社", "1972年生まれ", "dept_is", null),
+
+  N("fujihara",  "藤原菜々子", "採用代行", "採用代行", "2024年4月入社", "1995年生まれ", "dept_saiyo",
+    { p:7, x:650, y:530 }),
+  N("aoki",      "青木華乃", "採用代行", "採用代行", "2026年1月入社", "1998年生まれ", "dept_saiyo",
+    { p:7, x:1500, y:530 }),
+  N("higa",      "比嘉益晃", "採用代行", "採用代行", "2026年3月入社", "1998年生まれ", "dept_saiyo", null),
+
+  N("sato_k",    "佐藤響子", "バックオフィス", "バックオフィス", "2023年12月入社", "", "dept_bo",
+    { p:7, x:650, y:870 }),
+  N("owada",     "大和田美奈", "バックオフィス", "バックオフィス", "2026年2月入社", "1993年生まれ", "dept_bo", null),
+  N("sato_h",    "佐藤花織", "バックオフィス", "バックオフィス", "2026年3月入社", "1998年生まれ", "dept_bo", null),
+
+  N("takezawa",  "竹澤瑞希", "リーダー", "経営", "2024年1月入社", "1995年生まれ", "nagatsuma",
+    { p:1, x:1900, y:1365 }),
+];
+
+// ===== Rank =====
+// 0:社長, 1:部長/マネ, 2:サブマネ, 3:リーダー, 4:メンバー
+// 部署ボックスは親の階層+0.5（上下のランク帯の間に置く）
+function rankOfPerson(role) {
+  const r = role || "";
+  if (r.includes("社長")) return 0;
+  if (r.includes("部長")) return 1;
+  if (r.includes("マネージャー") && !r.includes("サブ")) return 1;
+  if (r.includes("サブマネージャー")) return 2;
+  if (r.includes("リーダー")) return 3;
+  return 4;
+}
+function rankOf(d) {
+  if (d.kind === "dept") {
+    const parent = STATE.byId && STATE.byId[d.parent];
+    if (parent) return rankOf(parent) + 0.5;
+    return 0.5;
+  }
+  return rankOfPerson(d.role);
+}
+const RANK_LABELS = ["社長", "部長 / マネージャー", "サブマネージャー", "リーダー", "メンバー"];
+
+// ===== Layout =====
+const NODE_W = 132;
+const NODE_H_PERSON = 130;
+const NODE_H_DEPT = 56;
+const H_GAP = 14;
+const RANK_GAP = 90;
+
+function buildTree() {
+  const byId = Object.fromEntries(DATA.map(d => [d.id, { ...d, children: [] }]));
+  const roots = [];
+  for (const d of DATA) {
+    const node = byId[d.id];
+    if (d.parent && byId[d.parent]) byId[d.parent].children.push(node);
+    else roots.push(node);
+  }
+  return { byId, roots };
+}
+
+// Layout: leaves under same parent arrange in compact N-column grid (max 2 wide).
+// Internal nodes use tidy tree (centered over their subtree).
+const LEAF_COLS = 2;
+const LEAF_ROW_GAP = 14;
+
+function layoutX(node, cursor) {
+  if (node.children.length === 0) {
+    node.x = cursor.x;
+    node.gridRow = 0; node.gridCol = 0;
+    cursor.x += NODE_W + H_GAP;
+    return;
+  }
+  const leafKids = node.children.filter(c => c.children.length === 0);
+  const innerKids = node.children.filter(c => c.children.length > 0);
+
+  const startX = cursor.x;
+  const placedXs = [];
+
+  // place leaf cluster as 2-column grid
+  if (leafKids.length > 0) {
+    const cols = Math.min(LEAF_COLS, leafKids.length);
+    const baseX = cursor.x;
+    leafKids.forEach((c, i) => {
+      c.gridCol = i % cols;
+      c.gridRow = Math.floor(i / cols);
+      c.x = baseX + c.gridCol * (NODE_W + H_GAP);
+    });
+    // center of leaf cluster
+    placedXs.push(baseX + (cols * (NODE_W + H_GAP) - H_GAP) / 2 - NODE_W / 2);
+    cursor.x = baseX + cols * (NODE_W + H_GAP);
+  }
+
+  // place inner subtrees side-by-side
+  for (const c of innerKids) {
+    layoutX(c, cursor);
+    placedXs.push(c.x);
+  }
+
+  if (placedXs.length === 1) {
+    node.x = placedXs[0];
+  } else {
+    node.x = (placedXs[0] + placedXs[placedXs.length - 1]) / 2;
+  }
+}
+
+function autoLayout(roots) {
+  const cursor = { x: 0 };
+  for (const r of roots) {
+    layoutX(r, cursor);
+    cursor.x += H_GAP * 3;
+  }
+  // Two-pass Y assignment:
+  // 1) persons at strict rank rows
+  // 2) dept boxes positioned just below parent (between rank rows)
+  for (const d of Object.values(STATE.byId)) {
+    if (d.kind === "person") {
+      const baseY = rankOfPerson(d.role) * (NODE_H_PERSON + RANK_GAP);
+      const rowOffset = (d.gridRow || 0) * (NODE_H_PERSON + LEAF_ROW_GAP);
+      d.y = baseY + rowOffset;
+    }
+  }
+  for (const d of Object.values(STATE.byId)) {
+    if (d.kind === "dept") {
+      const parent = STATE.byId[d.parent];
+      const parentH = parent ? (parent.kind === "dept" ? NODE_H_DEPT : NODE_H_PERSON) : NODE_H_PERSON;
+      d.y = (parent ? parent.y : 0) + parentH + 24;
+    }
+  }
+}
+
+// ===== Avatar =====
+function avatarColor(seed) {
+  let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 55% 86%)`;
+}
+function avatarInk(seed) {
+  let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 55% 30%)`;
+}
+// Use per-member face PNG (auto-cropped via OpenCV card detection)
+function faceImgSrc(id) {
+  return `assets/faces/${id}.png`;
+}
+
+// ===== Render =====
+const canvas = document.getElementById("canvas");
+const linesSvg = document.getElementById("lines");
+const canvasWrap = document.getElementById("canvasWrap");
+const zoomLabel = document.getElementById("zoomLabel");
+const qEl = document.getElementById("q");
+
+const STATE = { byId: {}, roots: [], scale: 1, tx: 0, ty: 0, nodeEls: new Map() };
+
+function nodeHeight(d) { return d.kind === "dept" ? NODE_H_DEPT : NODE_H_PERSON; }
+
+function render() {
+  STATE.nodeEls.forEach(el => el.remove());
+  STATE.nodeEls.clear();
+  // remove old bands and labels
+  canvas.querySelectorAll(".rank-band, .rank-band-label").forEach(el => el.remove());
+  linesSvg.innerHTML = "";
+
+  // compute canvas bounds
+  let minX = Infinity, maxX = -Infinity;
+  for (const d of Object.values(STATE.byId)) {
+    minX = Math.min(minX, d.x);
+    maxX = Math.max(maxX, d.x + NODE_W);
+  }
+  const bandWidth = maxX - minX + 200;
+
+  // rank bands
+  for (let r = 0; r < RANK_LABELS.length; r++) {
+    const band = document.createElement("div");
+    band.className = "rank-band";
+    band.style.top = (r * (NODE_H_PERSON + RANK_GAP) - 10) + "px";
+    band.style.left = (minX - 100) + "px";
+    band.style.width = bandWidth + "px";
+    band.style.height = (NODE_H_PERSON + 20) + "px";
+    canvas.appendChild(band);
+    const label = document.createElement("div");
+    label.className = "rank-band-label";
+    label.style.top = (r * (NODE_H_PERSON + RANK_GAP) + 4) + "px";
+    label.style.left = (minX - 90) + "px";
+    label.textContent = `L${r}  ${RANK_LABELS[r]}`;
+    canvas.appendChild(label);
+  }
+
+  // nodes
+  for (const d of Object.values(STATE.byId)) {
+    const el = document.createElement("div");
+    el.className = "node" + (d.kind === "dept" ? " dept-rect" : "");
+    el.dataset.id = d.id;
+    if (d.kind === "person") {
+      const avStyle = `background:${avatarColor(d.name)};color:${avatarInk(d.name)};`;
+      const imgTag = `<img src="${faceImgSrc(d.id)}" alt="" onerror="this.style.display='none'">`;
+      el.innerHTML = `
+        <button class="edit-btn" data-edit="${d.id}" title="編集">✎</button>
+        <div class="avatar" style="${avStyle}">${imgTag}<span style="position:relative;z-index:-1">${d.name[0]}</span></div>
+        <div class="node-role">${d.role}</div>
+        <div class="node-name">${d.name}</div>
+        <div class="node-meta">${d.joined || ""}${d.birth ? "<br>" + d.birth : ""}</div>
+      `;
+    } else {
+      el.innerHTML = `
+        <button class="edit-btn" data-edit="${d.id}" title="編集">✎</button>
+        <div class="dept-title">${d.name}</div>
+        <div class="dept-sub">${d.role || ""}</div>
+      `;
+    }
+    el.style.left = d.x + "px";
+    el.style.top = d.y + "px";
+    attachDrag(el, d);
+    canvas.appendChild(el);
+    STATE.nodeEls.set(d.id, el);
+  }
+  drawLines();
+  updateBounds();
+}
+
+function drawLines() {
+  let svg = "";
+  for (const d of Object.values(STATE.byId)) {
+    if (!d.parent) continue;
+    const p = STATE.byId[d.parent];
+    if (!p) continue;
+    const x1 = p.x + NODE_W / 2;
+    const y1 = p.y + nodeHeight(p);
+    const x2 = d.x + NODE_W / 2;
+    const y2 = d.y;
+    const my = (y1 + y2) / 2;
+    svg += `<path d="M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}" stroke="#94a3b8" stroke-width="1.5" fill="none" stroke-dasharray="4 4" />`;
+  }
+  linesSvg.innerHTML = svg;
+}
+
+function updateBounds() {
+  let maxX = 0, maxY = 0;
+  for (const d of Object.values(STATE.byId)) {
+    maxX = Math.max(maxX, d.x + NODE_W);
+    maxY = Math.max(maxY, d.y + nodeHeight(d));
+  }
+  linesSvg.setAttribute("width", maxX + 200);
+  linesSvg.setAttribute("height", maxY + 200);
+}
+
+function applyTransform() {
+  canvas.style.transform = `translate(${STATE.tx}px, ${STATE.ty}px) scale(${STATE.scale})`;
+  zoomLabel.textContent = Math.round(STATE.scale * 100) + "%";
+}
+
+// ===== Node Drag =====
+function attachDrag(el, d) {
+  let startX, startY, startLeft, startTop, dragging = false;
+  el.addEventListener("pointerdown", e => {
+    // Don't drag when clicking edit button
+    if (e.target.closest(".edit-btn")) return;
+    e.stopPropagation();
+    dragging = true;
+    el.classList.add("dragging");
+    el.setPointerCapture(e.pointerId);
+    startX = e.clientX; startY = e.clientY;
+    startLeft = d.x; startTop = d.y;
+  });
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = (e.clientX - startX) / STATE.scale;
+    const dy = (e.clientY - startY) / STATE.scale;
+    d.x = startLeft + dx;
+    d.y = startTop + dy;
+    el.style.left = d.x + "px";
+    el.style.top = d.y + "px";
+    drawLines();
+    updateBounds();
+  });
+  el.addEventListener("pointerup", () => { dragging = false; el.classList.remove("dragging"); });
+  el.addEventListener("pointercancel", () => { dragging = false; el.classList.remove("dragging"); });
+}
+
+// ===== Canvas Pan =====
+let panning = false, panStart = null;
+canvasWrap.addEventListener("pointerdown", e => {
+  if (e.target !== canvasWrap) return;
+  panning = true;
+  canvasWrap.classList.add("panning");
+  panStart = { x: e.clientX, y: e.clientY, tx: STATE.tx, ty: STATE.ty };
+  canvasWrap.setPointerCapture(e.pointerId);
+});
+canvasWrap.addEventListener("pointermove", e => {
+  if (!panning) return;
+  STATE.tx = panStart.tx + (e.clientX - panStart.x);
+  STATE.ty = panStart.ty + (e.clientY - panStart.y);
+  applyTransform();
+});
+canvasWrap.addEventListener("pointerup", () => { panning = false; canvasWrap.classList.remove("panning"); });
+
+// ===== Wheel Zoom =====
+canvasWrap.addEventListener("wheel", e => {
+  e.preventDefault();
+  const rect = canvasWrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const delta = -e.deltaY * 0.0015;
+  const oldScale = STATE.scale;
+  const newScale = Math.min(2.5, Math.max(0.15, oldScale * (1 + delta)));
+  const k = newScale / oldScale;
+  STATE.tx = mx - k * (mx - STATE.tx);
+  STATE.ty = my - k * (my - STATE.ty);
+  STATE.scale = newScale;
+  applyTransform();
+}, { passive: false });
+
+function fitToView() {
+  let maxX = -Infinity, maxY = -Infinity, minX = Infinity, minY = Infinity;
+  for (const d of Object.values(STATE.byId)) {
+    minX = Math.min(minX, d.x);
+    minY = Math.min(minY, d.y);
+    maxX = Math.max(maxX, d.x + NODE_W);
+    maxY = Math.max(maxY, d.y + nodeHeight(d));
+  }
+  minX -= 120; minY -= 30; // include band label
+  const w = maxX - minX, h = maxY - minY;
+  const rect = canvasWrap.getBoundingClientRect();
+  const pad = 30;
+  const sx = (rect.width - pad * 2) / w;
+  const sy = (rect.height - pad * 2) / h;
+  STATE.scale = Math.min(sx, sy, 1);
+  STATE.tx = pad - minX * STATE.scale + (rect.width - pad * 2 - w * STATE.scale) / 2;
+  STATE.ty = pad - minY * STATE.scale + (rect.height - pad * 2 - h * STATE.scale) / 2;
+  applyTransform();
+}
+
+function init() {
+  const { byId, roots } = buildTree();
+  STATE.byId = byId; STATE.roots = roots;
+  autoLayout(roots);
+  render();
+  fitToView();
+}
+
+document.getElementById("btnFit").addEventListener("click", fitToView);
+document.getElementById("btnReset").addEventListener("click", init);
+document.getElementById("btnZoomIn").addEventListener("click", () => {
+  const rect = canvasWrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const oldScale = STATE.scale;
+  STATE.scale = Math.min(2.5, oldScale * 1.2);
+  const k = STATE.scale / oldScale;
+  STATE.tx = mx - k * (mx - STATE.tx);
+  STATE.ty = my - k * (my - STATE.ty);
+  applyTransform();
+});
+document.getElementById("btnZoomOut").addEventListener("click", () => {
+  const rect = canvasWrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const oldScale = STATE.scale;
+  STATE.scale = Math.max(0.15, oldScale / 1.2);
+  const k = STATE.scale / oldScale;
+  STATE.tx = mx - k * (mx - STATE.tx);
+  STATE.ty = my - k * (my - STATE.ty);
+  applyTransform();
+});
+
+qEl.addEventListener("input", () => {
+  const q = qEl.value.trim().toLowerCase();
+  if (!q) {
+    STATE.nodeEls.forEach(el => { el.classList.remove("dim"); el.classList.remove("match"); });
+    return;
+  }
+  STATE.nodeEls.forEach((el, id) => {
+    const d = STATE.byId[id];
+    const hay = [d.name, d.role, d.dept, d.joined, d.birth].filter(Boolean).join(" ").toLowerCase();
+    if (hay.includes(q)) { el.classList.add("match"); el.classList.remove("dim"); }
+    else { el.classList.add("dim"); el.classList.remove("match"); }
+  });
+});
+
+// ===== Editor =====
+const ROLE_OPTIONS = [
+  "社長",
+  "部長",
+  "部長 / 営業部長",
+  "マネージャー",
+  "サブマネージャー",
+  "リーダー",
+  "CSリーダー",
+  "デジマケ リーダー",
+  "ライター リーダー",
+  "運用 リーダー",
+  "リーダー / CSリーダー",
+  "メンバー",
+  "運用メンバー",
+  "アシスタント",
+  "担当CS",
+  "ユニット未定",
+  "担当未定",
+  "MEO事業部",
+  "HP事業部",
+  "IS",
+  "採用代行",
+  "バックオフィス",
+];
+const DEPT_OPTIONS = [
+  "経営",
+  "営業部",
+  "営業CS",
+  "デジマケ",
+  "ライター",
+  "運用",
+  "ハコプロ",
+  "インサイドセールス",
+  "採用代行",
+  "バックオフィス",
+];
+
+const modalBg = document.getElementById("modalBg");
+const mAvatar = document.getElementById("mAvatar");
+const mName = document.getElementById("mName");
+const mSub = document.getElementById("mSub");
+const mRole = document.getElementById("mRole");
+const mDept = document.getElementById("mDept");
+const mParent = document.getElementById("mParent");
+const mSave = document.getElementById("mSave");
+const mCancel = document.getElementById("mCancel");
+
+let editingId = null;
+
+function descendantIds(id) {
+  // collect all descendants (to prevent picking a descendant as parent)
+  const out = new Set();
+  function walk(curId) {
+    for (const k of Object.keys(STATE.byId)) {
+      if (STATE.byId[k].parent === curId) {
+        out.add(k);
+        walk(k);
+      }
+    }
+  }
+  walk(id);
+  return out;
+}
+
+function fillSelect(sel, options, current) {
+  sel.innerHTML = "";
+  let hasCurrent = false;
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    if (o.value === current) { opt.selected = true; hasCurrent = true; }
+    sel.appendChild(opt);
+  }
+  // If current isn't in the list, add it at the top
+  if (current && !hasCurrent) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = current + " (現在)";
+    opt.selected = true;
+    sel.insertBefore(opt, sel.firstChild);
+  }
+}
+
+function openEditor(id) {
+  const d = STATE.byId[id];
+  if (!d) return;
+  editingId = id;
+  mName.textContent = d.name + (d.kind === "dept" ? " (部署)" : "");
+  mSub.textContent = d.kind === "person"
+    ? `${d.dept || ""}${d.joined ? "・" + d.joined : ""}`
+    : "部署ボックス";
+
+  // avatar
+  if (d.kind === "person") {
+    mAvatar.innerHTML = `<img src="${faceImgSrc(d.id)}" onerror="this.style.display='none'"><span>${d.name[0]}</span>`;
+  } else {
+    mAvatar.innerHTML = "🏢";
+  }
+
+  // role select
+  const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
+  fillSelect(mRole, roleOpts, d.role);
+  // dept select
+  const deptOpts = DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }));
+  fillSelect(mDept, deptOpts, d.dept);
+  // parent select: exclude self + descendants
+  const banned = descendantIds(id);
+  banned.add(id);
+  const parentOpts = [{ value: "", label: "（なし／ルート）" }];
+  // Group: persons and dept boxes
+  const groups = { person: [], dept: [] };
+  for (const k of Object.keys(STATE.byId)) {
+    if (banned.has(k)) continue;
+    const n = STATE.byId[k];
+    groups[n.kind].push({
+      value: k,
+      label: n.kind === "dept" ? `[部署] ${n.name}` : `${n.name}（${n.role}）`
+    });
+  }
+  groups.person.sort((a, b) => a.label.localeCompare(b.label));
+  groups.dept.sort((a, b) => a.label.localeCompare(b.label));
+  for (const p of [...groups.person, ...groups.dept]) parentOpts.push(p);
+
+  fillSelect(mParent, parentOpts, d.parent || "");
+
+  // Hide dept select if this is a dept node
+  mDept.parentElement.style.display = d.kind === "dept" ? "none" : "block";
+
+  modalBg.classList.add("show");
+  setTimeout(() => mRole.focus(), 50);
+}
+
+function closeEditor() {
+  modalBg.classList.remove("show");
+  editingId = null;
+}
+
+mSave.addEventListener("click", () => {
+  if (!editingId) return;
+  const d = STATE.byId[editingId];
+  d.role = mRole.value;
+  if (d.kind === "person") d.dept = mDept.value;
+  d.parent = mParent.value || null;
+  // Re-build tree (children arrays) and layout
+  rebuildTree();
+  autoLayout(STATE.roots);
+  render();
+  persist();
+  closeEditor();
+});
+
+mCancel.addEventListener("click", closeEditor);
+modalBg.addEventListener("click", e => { if (e.target === modalBg) closeEditor(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && modalBg.classList.contains("show")) closeEditor(); });
+
+// Re-build the children arrays after parent changes
+function rebuildTree() {
+  for (const n of Object.values(STATE.byId)) n.children = [];
+  STATE.roots = [];
+  for (const n of Object.values(STATE.byId)) {
+    if (n.parent && STATE.byId[n.parent]) STATE.byId[n.parent].children.push(n);
+    else STATE.roots.push(n);
+  }
+}
+
+// Click handler on cards (delegated)
+document.getElementById("canvas").addEventListener("click", e => {
+  const btn = e.target.closest(".edit-btn");
+  if (btn) {
+    e.stopPropagation();
+    openEditor(btn.dataset.edit);
+  }
+});
+
+// ===== LocalStorage persistence =====
+const STORAGE_KEY = "orgnavi_state_v1";
+
+function persist() {
+  const data = {};
+  for (const id of Object.keys(STATE.byId)) {
+    const n = STATE.byId[id];
+    data[id] = {
+      role: n.role,
+      dept: n.dept,
+      parent: n.parent,
+      x: n.x,
+      y: n.y,
+    };
+  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadPersisted() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    for (const id of Object.keys(data)) {
+      if (!STATE.byId[id]) continue;
+      const saved = data[id];
+      STATE.byId[id].role = saved.role;
+      STATE.byId[id].dept = saved.dept;
+      STATE.byId[id].parent = saved.parent;
+      if (typeof saved.x === "number") STATE.byId[id].x = saved.x;
+      if (typeof saved.y === "number") STATE.byId[id].y = saved.y;
+    }
+    rebuildTree();
+    return true;
+  } catch { return false; }
+}
+
+// Also persist when user drags cards
+const origDrag = attachDrag;
+// (We don't need to re-wire — drag handlers update d.x/d.y in place. Add a hook below.)
+
+// Hook into pointer up to persist after drag
+canvas.addEventListener("pointerup", () => persist(), true);
+
+// Reset to original layout (clears localStorage). Use capture + stopImmediatePropagation
+// to override the earlier "click → init" handler when user confirms.
+document.getElementById("btnReset").addEventListener("click", (e) => {
+  e.stopImmediatePropagation();
+  if (!confirm("レイアウトと編集内容を初期化しますか？")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}, true);
+
+// Override init to support persistence
+function initWithPersist() {
+  const { byId, roots } = buildTree();
+  STATE.byId = byId; STATE.roots = roots;
+  const restored = loadPersisted();
+  if (!restored) {
+    autoLayout(roots);
+  }
+  render();
+  fitToView();
+}
+
+initWithPersist();
+</script>
+</body>
+</html>
