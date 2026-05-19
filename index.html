@@ -434,6 +434,7 @@
       <button id="vList">リスト</button>
     </div>
     <div class="toolbar" id="chartTools">
+      <button class="btn primary" id="btnAdd">＋新規メンバー</button>
       <button class="btn" id="btnFit">全体表示</button>
       <button class="btn" id="btnReset">レイアウト初期化</button>
     </div>
@@ -455,6 +456,7 @@
   </div>
   <div class="list-wrap hide" id="listWrap">
     <div class="list-toolbar">
+      <button class="btn primary" id="btnAddList">＋新規メンバー</button>
       <select class="filter" id="lfDept"><option value="">すべての部署</option></select>
       <select class="filter" id="lfStatus">
         <option value="">すべてのステータス</option>
@@ -490,6 +492,16 @@
     </h3>
     <div class="modal-sub" id="mSub"></div>
 
+    <div id="mNameInputWrap" style="display:none">
+      <label>名前</label>
+      <input type="text" id="mNameInput" placeholder="例：山田太郎" />
+    </div>
+
+    <div id="mPhotoWrap" style="display:none">
+      <label>顔写真</label>
+      <input type="file" id="mPhotoInput" accept="image/*" />
+    </div>
+
     <label>役職</label>
     <select id="mRole"></select>
 
@@ -507,7 +519,18 @@
       <option value="休職中">休職中</option>
     </select>
 
+    <div id="mJoinedWrap" style="display:none">
+      <label>入社日</label>
+      <input type="text" id="mJoinedInput" placeholder="例：2026年5月入社" />
+    </div>
+
+    <div id="mBirthWrap" style="display:none">
+      <label>生年</label>
+      <input type="text" id="mBirthInput" placeholder="例：1995年生まれ" />
+    </div>
+
     <div class="modal-buttons">
+      <button class="btn" id="mDelete" style="margin-right:auto;color:#dc2626;border-color:#fecaca;display:none">削除</button>
       <button class="btn" id="mCancel">キャンセル</button>
       <button class="btn primary" id="mSave">保存</button>
     </div>
@@ -783,7 +806,10 @@ function avatarInk(seed) {
   return `hsl(${h % 360} 55% 30%)`;
 }
 // Use per-member face PNG (auto-cropped via OpenCV card detection)
+// If member has a custom faceSrc (uploaded photo), use that instead.
 function faceImgSrc(id) {
+  const d = STATE && STATE.byId && STATE.byId[id];
+  if (d && d.faceSrc) return d.faceSrc;
   return `assets/faces/${id}.png`;
 }
 
@@ -1083,8 +1109,19 @@ const mParent = document.getElementById("mParent");
 const mStatus = document.getElementById("mStatus");
 const mSave = document.getElementById("mSave");
 const mCancel = document.getElementById("mCancel");
+const mDelete = document.getElementById("mDelete");
+const mNameInputWrap = document.getElementById("mNameInputWrap");
+const mNameInput = document.getElementById("mNameInput");
+const mPhotoWrap = document.getElementById("mPhotoWrap");
+const mPhotoInput = document.getElementById("mPhotoInput");
+const mJoinedWrap = document.getElementById("mJoinedWrap");
+const mJoinedInput = document.getElementById("mJoinedInput");
+const mBirthWrap = document.getElementById("mBirthWrap");
+const mBirthInput = document.getElementById("mBirthInput");
 
 let editingId = null;
+let isAddMode = false;
+let pendingFaceSrc = null;
 
 function descendantIds(id) {
   // collect all descendants (to prevent picking a descendant as parent)
@@ -1121,11 +1158,66 @@ function fillSelect(sel, options, current) {
   }
 }
 
+function openAddMember() {
+  isAddMode = true;
+  editingId = null;
+  pendingFaceSrc = null;
+  mName.textContent = "新規メンバー追加";
+  mSub.textContent = "在籍に必要な情報を入力してください";
+  mAvatar.innerHTML = "<span>＋</span>";
+  // Show all fields including name + photo + joined + birth
+  mNameInputWrap.style.display = "block";
+  mNameInput.value = "";
+  mPhotoWrap.style.display = "block";
+  mPhotoInput.value = "";
+  mJoinedWrap.style.display = "block";
+  mJoinedInput.value = "";
+  mBirthWrap.style.display = "block";
+  mBirthInput.value = "";
+  mDelete.style.display = "none";
+
+  const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
+  fillSelect(mRole, roleOpts, "メンバー");
+  const deptOpts = DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }));
+  fillSelect(mDept, deptOpts, "営業CS");
+  const parentOpts = [{ value: "", label: "（なし／ルート）" }];
+  const groups = { person: [], dept: [] };
+  for (const k of Object.keys(STATE.byId)) {
+    const n = STATE.byId[k];
+    groups[n.kind].push({
+      value: k,
+      label: n.kind === "dept" ? `[部署] ${n.name}` : `${n.name}（${n.role}）`
+    });
+  }
+  groups.person.sort((a, b) => a.label.localeCompare(b.label));
+  groups.dept.sort((a, b) => a.label.localeCompare(b.label));
+  for (const p of [...groups.person, ...groups.dept]) parentOpts.push(p);
+  fillSelect(mParent, parentOpts, "");
+  mStatus.value = "active";
+  // Show all the labels
+  [mDept, mStatus].forEach(s => {
+    s.style.display = "block";
+    const lab = s.previousElementSibling;
+    if (lab && lab.tagName === "LABEL") lab.style.display = "block";
+  });
+  modalBg.classList.add("show");
+  setTimeout(() => mNameInput.focus(), 50);
+}
+
 function openEditor(id) {
+  isAddMode = false;
+  pendingFaceSrc = null;
   const d = STATE.byId[id];
   if (!d) return;
   editingId = id;
   mName.textContent = d.name + (d.kind === "dept" ? " (部署)" : "");
+  // Hide add-mode-only fields
+  mNameInputWrap.style.display = "none";
+  mPhotoWrap.style.display = "none";
+  mJoinedWrap.style.display = "none";
+  mBirthWrap.style.display = "none";
+  // Show delete only for user-added members (id starts with "new_")
+  mDelete.style.display = (d.kind === "person" && d.id.startsWith("new_")) ? "block" : "none";
   mSub.textContent = d.kind === "person"
     ? `${d.dept || ""}${d.joined ? "・" + d.joined : ""}`
     : "部署ボックス";
@@ -1183,6 +1275,31 @@ function closeEditor() {
 }
 
 mSave.addEventListener("click", () => {
+  if (isAddMode) {
+    const name = mNameInput.value.trim();
+    if (!name) { alert("名前を入力してください"); mNameInput.focus(); return; }
+    const id = "new_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const newMember = {
+      id, kind: "person", name,
+      role: mRole.value,
+      dept: mDept.value,
+      joined: mJoinedInput.value.trim(),
+      birth: mBirthInput.value.trim(),
+      parent: mParent.value || null,
+      status: mStatus.value || "active",
+      face: null,
+      faceSrc: pendingFaceSrc || null,
+      children: [],
+    };
+    STATE.byId[id] = newMember;
+    rebuildTree();
+    autoLayout(STATE.roots);
+    render();
+    persist();
+    closeEditor();
+    if (!listWrap.classList.contains("hide")) renderList();
+    return;
+  }
   if (!editingId) return;
   const d = STATE.byId[editingId];
   d.role = mRole.value;
@@ -1191,13 +1308,44 @@ mSave.addEventListener("click", () => {
     d.status = mStatus.value;
   }
   d.parent = mParent.value || null;
-  // Re-build tree (children arrays) and layout
   rebuildTree();
   autoLayout(STATE.roots);
   render();
   persist();
   closeEditor();
+  if (!listWrap.classList.contains("hide")) renderList();
 });
+
+mDelete.addEventListener("click", () => {
+  if (!editingId) return;
+  const d = STATE.byId[editingId];
+  if (!confirm(`「${d.name}」さんを削除しますか？\n配下メンバーは ${d.parent ? "上司に再接続" : "ルートに移動"} されます。`)) return;
+  // Reassign children to this node's parent (or null)
+  const newParent = d.parent || null;
+  for (const n of Object.values(STATE.byId)) {
+    if (n.parent === editingId) n.parent = newParent;
+  }
+  delete STATE.byId[editingId];
+  rebuildTree();
+  autoLayout(STATE.roots);
+  render();
+  persist();
+  closeEditor();
+  if (!listWrap.classList.contains("hide")) renderList();
+});
+
+// Handle photo upload
+mPhotoInput.addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) { pendingFaceSrc = null; return; }
+  const reader = new FileReader();
+  reader.onload = ev => { pendingFaceSrc = ev.target.result; };
+  reader.readAsDataURL(file);
+});
+
+// Add buttons (chart + list views)
+document.getElementById("btnAdd").addEventListener("click", openAddMember);
+document.getElementById("btnAddList").addEventListener("click", openAddMember);
 
 mCancel.addEventListener("click", closeEditor);
 modalBg.addEventListener("click", e => { if (e.target === modalBg) closeEditor(); });
@@ -1227,34 +1375,46 @@ const STORAGE_KEY = "orgnavi_state_v1";
 
 function persist() {
   const data = {};
+  const newMembers = [];
   for (const id of Object.keys(STATE.byId)) {
     const n = STATE.byId[id];
-    data[id] = {
-      role: n.role,
-      dept: n.dept,
-      parent: n.parent,
-      status: n.status,
-      x: n.x,
-      y: n.y,
-    };
+    if (id.startsWith("new_")) {
+      newMembers.push({
+        id, name: n.name, role: n.role, dept: n.dept,
+        joined: n.joined, birth: n.birth, parent: n.parent,
+        status: n.status, faceSrc: n.faceSrc, kind: n.kind,
+        x: n.x, y: n.y,
+      });
+    } else {
+      data[id] = {
+        role: n.role, dept: n.dept, parent: n.parent,
+        status: n.status, x: n.x, y: n.y,
+      };
+    }
   }
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, newMembers })); } catch {}
 }
 
 function loadPersisted() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
-    const data = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Backward compatibility: old format was a flat object of {id: changes}
+    const data = parsed.data || parsed;
+    const newMembers = parsed.newMembers || [];
     for (const id of Object.keys(data)) {
       if (!STATE.byId[id]) continue;
       const saved = data[id];
-      STATE.byId[id].role = saved.role;
-      STATE.byId[id].dept = saved.dept;
-      STATE.byId[id].parent = saved.parent;
+      if (saved.role !== undefined) STATE.byId[id].role = saved.role;
+      if (saved.dept !== undefined) STATE.byId[id].dept = saved.dept;
+      if (saved.parent !== undefined) STATE.byId[id].parent = saved.parent;
       if (saved.status) STATE.byId[id].status = saved.status;
       if (typeof saved.x === "number") STATE.byId[id].x = saved.x;
       if (typeof saved.y === "number") STATE.byId[id].y = saved.y;
+    }
+    for (const m of newMembers) {
+      STATE.byId[m.id] = { ...m, kind: m.kind || "person", children: [] };
     }
     rebuildTree();
     return true;
