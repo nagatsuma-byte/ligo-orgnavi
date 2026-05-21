@@ -499,7 +499,10 @@
 
     <div id="mPhotoWrap" style="display:none">
       <label>顔写真</label>
-      <input type="file" id="mPhotoInput" accept="image/*" />
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="file" id="mPhotoInput" accept="image/*" style="flex:1; font-size:12px;" />
+        <button type="button" class="btn" id="mPhotoReset" style="font-size:11px; display:none;">デフォルトに戻す</button>
+      </div>
     </div>
 
     <label>役職</label>
@@ -1110,6 +1113,7 @@ const mBirthInput = document.getElementById("mBirthInput");
 let editingId = null;
 let isAddMode = false;
 let pendingFaceSrc = null;
+let pendingFaceReset = false;
 
 function descendantIds(id) {
   // collect all descendants (to prevent picking a descendant as parent)
@@ -1150,6 +1154,8 @@ function openAddMember() {
   isAddMode = true;
   editingId = null;
   pendingFaceSrc = null;
+  pendingFaceReset = false;
+  document.getElementById("mPhotoReset").style.display = "none";
   mName.textContent = "新規メンバー追加";
   mSub.textContent = "名前と役職だけでも追加できます";
   mAvatar.innerHTML = "<span>＋</span>";
@@ -1196,15 +1202,20 @@ function openAddMember() {
 function openEditor(id) {
   isAddMode = false;
   pendingFaceSrc = null;
+  pendingFaceReset = false;
   const d = STATE.byId[id];
   if (!d) return;
   editingId = id;
   mName.textContent = d.name + (d.kind === "dept" ? " (部署)" : "");
-  // Hide add-mode-only fields
+  // Hide add-mode-only fields, but photo + joined + birth are allowed in edit
   mNameInputWrap.style.display = "none";
-  mPhotoWrap.style.display = "none";
-  mJoinedWrap.style.display = "none";
-  mBirthWrap.style.display = "none";
+  mPhotoWrap.style.display = d.kind === "person" ? "block" : "none";
+  mPhotoInput.value = "";
+  document.getElementById("mPhotoReset").style.display = (d.kind === "person" && d.faceSrc) ? "inline-block" : "none";
+  mJoinedWrap.style.display = d.kind === "person" ? "block" : "none";
+  mJoinedInput.value = d.joined || "";
+  mBirthWrap.style.display = d.kind === "person" ? "block" : "none";
+  mBirthInput.value = d.birth || "";
   // Show delete only for user-added members (id starts with "new_")
   mDelete.style.display = (d.kind === "person" && d.id.startsWith("new_")) ? "block" : "none";
   mSub.textContent = d.kind === "person"
@@ -1295,6 +1306,10 @@ mSave.addEventListener("click", () => {
   if (d.kind === "person") {
     d.dept = mDept.value;
     d.status = mStatus.value;
+    d.joined = mJoinedInput.value.trim();
+    d.birth = mBirthInput.value.trim();
+    if (pendingFaceReset) d.faceSrc = null;
+    else if (pendingFaceSrc) d.faceSrc = pendingFaceSrc;
   }
   d.parent = mParent.value || null;
   rebuildTree();
@@ -1328,8 +1343,20 @@ mPhotoInput.addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) { pendingFaceSrc = null; return; }
   const reader = new FileReader();
-  reader.onload = ev => { pendingFaceSrc = ev.target.result; };
+  reader.onload = ev => {
+    pendingFaceSrc = ev.target.result;
+    pendingFaceReset = false;
+  };
   reader.readAsDataURL(file);
+});
+
+// "Reset to default photo" button
+document.getElementById("mPhotoReset").addEventListener("click", () => {
+  pendingFaceReset = true;
+  pendingFaceSrc = null;
+  mPhotoInput.value = "";
+  document.getElementById("mPhotoReset").style.display = "none";
+  alert("保存ボタンを押すとデフォルトの写真に戻ります");
 });
 
 // Add buttons (chart + list views)
@@ -1378,6 +1405,7 @@ function persist() {
       data[id] = {
         role: n.role, dept: n.dept, parent: n.parent,
         status: n.status, x: n.x, y: n.y,
+        faceSrc: n.faceSrc, joined: n.joined, birth: n.birth,
       };
     }
   }
@@ -1399,6 +1427,9 @@ function loadPersisted() {
       if (saved.dept !== undefined) STATE.byId[id].dept = saved.dept;
       if (saved.parent !== undefined) STATE.byId[id].parent = saved.parent;
       if (saved.status) STATE.byId[id].status = saved.status;
+      if (saved.faceSrc !== undefined) STATE.byId[id].faceSrc = saved.faceSrc;
+      if (saved.joined !== undefined) STATE.byId[id].joined = saved.joined;
+      if (saved.birth !== undefined) STATE.byId[id].birth = saved.birth;
       if (typeof saved.x === "number") STATE.byId[id].x = saved.x;
       if (typeof saved.y === "number") STATE.byId[id].y = saved.y;
     }
