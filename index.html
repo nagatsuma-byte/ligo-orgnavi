@@ -505,8 +505,8 @@
           <th></th>
           <th data-sort="name">名前</th>
           <th data-sort="role">役職</th>
-          <th data-sort="dept">部署</th>
-          <th data-sort="parent">所属チーム</th>
+          <th data-sort="dept">所属チーム</th>
+          <th data-sort="parent">所属長</th>
           <th data-sort="status">ステータス</th>
           <th data-sort="joined">入社／生年</th>
           <th></th>
@@ -541,10 +541,10 @@
     <label>役職</label>
     <select id="mRole"></select>
 
-    <label>部署</label>
+    <label>所属チーム</label>
     <select id="mDept"></select>
 
-    <label>所属チーム（上司／部署）</label>
+    <label>所属長（リーダー以上）</label>
     <select id="mParent"></select>
 
     <label>ステータス</label>
@@ -1210,18 +1210,16 @@ function openAddMember() {
   // 部署は任意（未設定OK）
   const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
   fillSelect(mDept, deptOpts, "");
-  const parentOpts = [{ value: "", label: "（なし／ルート）" }];
-  const groups = { person: [], dept: [] };
+  const parentOpts = [{ value: "", label: "（なし）" }];
+  const eligible = [];
   for (const k of Object.keys(STATE.byId)) {
     const n = STATE.byId[k];
-    groups[n.kind].push({
-      value: k,
-      label: n.kind === "dept" ? `[部署] ${n.name}` : `${n.name}（${n.role}）`
-    });
+    if (n.kind !== "person") continue;
+    if (rankOfPerson(n.role) > 6) continue;
+    eligible.push({ value: k, label: `${n.name}（${n.role}）` });
   }
-  groups.person.sort((a, b) => a.label.localeCompare(b.label));
-  groups.dept.sort((a, b) => a.label.localeCompare(b.label));
-  for (const p of [...groups.person, ...groups.dept]) parentOpts.push(p);
+  eligible.sort((a, b) => a.label.localeCompare(b.label, "ja"));
+  for (const p of eligible) parentOpts.push(p);
   fillSelect(mParent, parentOpts, "");
   mStatus.value = "active";
   // Show all the labels
@@ -1271,23 +1269,20 @@ function openEditor(id) {
   // dept select (任意)
   const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
   fillSelect(mDept, deptOpts, d.dept || "");
-  // parent select: exclude self + descendants
+  // 所属長 select: only リーダー以上 (rank 0-6), exclude self + descendants
   const banned = descendantIds(id);
   banned.add(id);
-  const parentOpts = [{ value: "", label: "（なし／ルート）" }];
-  // Group: persons and dept boxes
-  const groups = { person: [], dept: [] };
+  const parentOpts = [{ value: "", label: "（なし）" }];
+  const eligible = [];
   for (const k of Object.keys(STATE.byId)) {
     if (banned.has(k)) continue;
     const n = STATE.byId[k];
-    groups[n.kind].push({
-      value: k,
-      label: n.kind === "dept" ? `[部署] ${n.name}` : `${n.name}（${n.role}）`
-    });
+    if (n.kind !== "person") continue;
+    if (rankOfPerson(n.role) > 6) continue; // exclude メンバー/パートナー
+    eligible.push({ value: k, label: `${n.name}（${n.role}）` });
   }
-  groups.person.sort((a, b) => a.label.localeCompare(b.label));
-  groups.dept.sort((a, b) => a.label.localeCompare(b.label));
-  for (const p of [...groups.person, ...groups.dept]) parentOpts.push(p);
+  eligible.sort((a, b) => a.label.localeCompare(b.label, "ja"));
+  for (const p of eligible) parentOpts.push(p);
 
   fillSelect(mParent, parentOpts, d.parent || "");
 
@@ -1626,15 +1621,11 @@ function renderList() {
   const deptOptionsHTML = '<option value="">（未設定）</option>' + DEPT_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
   const statusOptionsHTML = `<option value="active">在籍中</option><option value="産休">産休</option><option value="育休">育休</option><option value="休職中">休職中</option>`;
 
-  // Parent options (people + depts, sorted)
-  const personOpts = Object.values(STATE.byId)
-    .filter(d => d.kind === "person")
+  // 所属長 options (only リーダー以上)
+  const eligibleMgr = Object.values(STATE.byId)
+    .filter(d => d.kind === "person" && rankOfPerson(d.role) <= 6)
     .sort((a, b) => a.name.localeCompare(b.name, "ja"))
     .map(d => ({ id: d.id, label: `${d.name}（${d.role}）` }));
-  const deptOpts = Object.values(STATE.byId)
-    .filter(d => d.kind === "dept")
-    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
-    .map(d => ({ id: d.id, label: `[部署] ${d.name}` }));
 
   memberTbody.innerHTML = "";
   for (const m of members) {
@@ -1642,11 +1633,11 @@ function renderList() {
     if (m.status && m.status !== "active") tr.classList.add("on-leave-row");
     tr.dataset.id = m.id;
 
-    // Parent options exclude self + descendants
+    // 所属長 options exclude self + descendants
     const desc = descendantIds(m.id);
     desc.add(m.id);
-    const parentHTML = '<option value="">（なし／ルート）</option>' +
-      [...personOpts, ...deptOpts]
+    const parentHTML = '<option value="">（なし）</option>' +
+      eligibleMgr
         .filter(o => !desc.has(o.id))
         .map(o => `<option value="${o.id}">${o.label}</option>`)
         .join("");
