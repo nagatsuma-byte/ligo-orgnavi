@@ -1333,10 +1333,18 @@ const DEPT_OPTIONS = [
 
 // 新しい 3 階層
 const DIVISION_OPTIONS = ["営業部", "伴走部", "新規事業部", "管理部"];
-const SECTION_OPTIONS = ["営業", "採用代行", "採用DX", "運用", "制作", "ハコプロ", "管理部門"];
+const SECTION_OPTIONS = ["営業", "採用代行", "採用DX", "運用", "制作", "ハコプロ", "管理"];
 const JOB_OPTIONS = ["営業", "CS", "運用", "ライター", "経理", "人事総務", "プランナー（SDX）", "採用オペ", "ISオペ", "ハコプロ企画"];
 
-// 課 → 職種 の推奨マッピング（参考表示用）
+// 部門 → 課 の対応
+const DIVISION_TO_SECTIONS = {
+  "営業部": ["営業", "採用代行", "採用DX"],
+  "伴走部": ["運用", "制作"],
+  "新規事業部": ["ハコプロ"],
+  "管理部": ["管理"],
+};
+
+// 課 → 職種 の対応
 const SECTION_TO_JOBS = {
   "営業": ["営業", "CS", "ISオペ"],
   "採用代行": ["採用オペ"],
@@ -1344,12 +1352,12 @@ const SECTION_TO_JOBS = {
   "運用": ["運用"],
   "制作": ["ライター"],
   "ハコプロ": ["ハコプロ企画"],
-  "管理部門": ["経理", "人事総務"],
+  "管理": ["経理", "人事総務"],
 };
 
 // 旧 dept → 新 3階層 への移行マッピング
 const DEPT_MIGRATION = {
-  "経営": { division: "管理部", section: "管理部門", jobType: "" },
+  "経営": { division: "管理部", section: "管理", jobType: "" },
   "営業部": { division: "営業部", section: "", jobType: "" },
   "営業CS": { division: "営業部", section: "営業", jobType: "CS" },
   "デジマケ": { division: "新規事業部", section: "採用DX", jobType: "プランナー（SDX）" },
@@ -1358,7 +1366,7 @@ const DEPT_MIGRATION = {
   "ハコプロ": { division: "新規事業部", section: "ハコプロ", jobType: "ハコプロ企画" },
   "インサイドセールス": { division: "営業部", section: "営業", jobType: "ISオペ" },
   "採用代行": { division: "伴走部", section: "採用代行", jobType: "採用オペ" },
-  "バックオフィス": { division: "管理部", section: "管理部門", jobType: "経理" },
+  "バックオフィス": { division: "管理部", section: "管理", jobType: "経理" },
 };
 
 const modalBg = document.getElementById("modalBg");
@@ -1403,6 +1411,22 @@ function descendantIds(id) {
   return out;
 }
 
+// Cascading dropdowns for 部門 → 課 → 職種
+function fillDivisionSelect(current) {
+  const opts = [{ value: "", label: "（未設定）" }, ...DIVISION_OPTIONS.map(v => ({ value: v, label: v }))];
+  fillSelect(mDivision, opts, current);
+}
+function fillSectionSelect(division, current) {
+  const allowed = division ? (DIVISION_TO_SECTIONS[division] || []) : SECTION_OPTIONS;
+  const opts = [{ value: "", label: "（未設定）" }, ...allowed.map(v => ({ value: v, label: v }))];
+  fillSelect(mSection, opts, allowed.includes(current) ? current : "");
+}
+function fillJobSelect(section, current) {
+  const allowed = section ? (SECTION_TO_JOBS[section] || []) : JOB_OPTIONS;
+  const opts = [{ value: "", label: "（未設定）" }, ...allowed.map(v => ({ value: v, label: v }))];
+  fillSelect(mJob, opts, allowed.includes(current) ? current : "");
+}
+
 function fillSelect(sel, options, current) {
   sel.innerHTML = "";
   let hasCurrent = false;
@@ -1445,11 +1469,10 @@ function openAddMember() {
 
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, "リーダー");
-  // 3-level organization (all optional)
-  const noneOptAdd = { value: "", label: "（未設定）" };
-  fillSelect(mDivision, [noneOptAdd, ...DIVISION_OPTIONS.map(v => ({ value: v, label: v }))], "");
-  fillSelect(mSection, [noneOptAdd, ...SECTION_OPTIONS.map(v => ({ value: v, label: v }))], "");
-  fillSelect(mJob, [noneOptAdd, ...JOB_OPTIONS.map(v => ({ value: v, label: v }))], "");
+  // 3-level organization (cascading)
+  fillDivisionSelect("");
+  fillSectionSelect("", "");
+  fillJobSelect("", "");
   const parentOpts = [{ value: "", label: "（なし）" }];
   const eligible = [];
   for (const k of Object.keys(STATE.byId)) {
@@ -1506,11 +1529,10 @@ function openEditor(id) {
   // role select
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, d.role);
-  // 3-level organization selects (all optional)
-  const noneOpt = { value: "", label: "（未設定）" };
-  fillSelect(mDivision, [noneOpt, ...DIVISION_OPTIONS.map(v => ({ value: v, label: v }))], d.division || "");
-  fillSelect(mSection, [noneOpt, ...SECTION_OPTIONS.map(v => ({ value: v, label: v }))], d.section || "");
-  fillSelect(mJob, [noneOpt, ...JOB_OPTIONS.map(v => ({ value: v, label: v }))], d.jobType || "");
+  // 3-level organization selects (cascading: 部門 → 課 → 職種)
+  fillDivisionSelect(d.division || "");
+  fillSectionSelect(d.division || "", d.section || "");
+  fillJobSelect(d.section || "", d.jobType || "");
   // 所属長 select: only リーダー以上 (rank 0-6), exclude self + descendants
   const banned = descendantIds(id);
   banned.add(id);
@@ -1644,6 +1666,15 @@ document.getElementById("mPhotoReset").addEventListener("click", () => {
 // Add buttons (chart + list views)
 document.getElementById("btnAdd").addEventListener("click", openAddMember);
 document.getElementById("btnAddList").addEventListener("click", openAddMember);
+
+// Cascade: when 部門 changes, refilter 課. When 課 changes, refilter 職種.
+mDivision.addEventListener("change", () => {
+  fillSectionSelect(mDivision.value, mSection.value);
+  fillJobSelect(mSection.value, mJob.value);
+});
+mSection.addEventListener("change", () => {
+  fillJobSelect(mSection.value, mJob.value);
+});
 
 mCancel.addEventListener("click", closeEditor);
 modalBg.addEventListener("click", e => { if (e.target === modalBg) closeEditor(); });
