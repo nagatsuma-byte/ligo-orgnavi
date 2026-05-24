@@ -670,7 +670,9 @@
           <th></th>
           <th data-sort="name">名前</th>
           <th data-sort="role">役職</th>
-          <th data-sort="dept">所属チーム</th>
+          <th data-sort="division">部門</th>
+          <th data-sort="section">課</th>
+          <th data-sort="jobType">職種</th>
           <th data-sort="parent">所属長</th>
           <th data-sort="status">ステータス</th>
           <th data-sort="joined">入社／生年</th>
@@ -726,8 +728,14 @@
     <label>役職</label>
     <select id="mRole"></select>
 
-    <label>所属チーム</label>
-    <select id="mDept"></select>
+    <label>部門</label>
+    <select id="mDivision"></select>
+
+    <label>課</label>
+    <select id="mSection"></select>
+
+    <label>職種</label>
+    <select id="mJob"></select>
 
     <label>所属長（リーダー以上）</label>
     <select id="mParent"></select>
@@ -918,7 +926,19 @@ const H_GAP = 14;
 const RANK_GAP = 90;
 
 function buildTree() {
-  const byId = Object.fromEntries(DATA.map(d => [d.id, { ...d, children: [] }]));
+  const byId = Object.fromEntries(DATA.map(d => {
+    const node = { ...d, children: [] };
+    // Auto-migrate legacy `dept` → division/section/jobType if not already set
+    if (node.dept && (!node.division && !node.section && !node.jobType)) {
+      const mig = DEPT_MIGRATION[node.dept];
+      if (mig) {
+        node.division = mig.division;
+        node.section = mig.section;
+        node.jobType = mig.jobType;
+      }
+    }
+    return [d.id, node];
+  }));
   const roots = [];
   for (const d of DATA) {
     const node = byId[d.id];
@@ -1297,6 +1317,7 @@ const ROLE_OPTIONS = [
   "メンバー",
   "パートナー",
 ];
+// 旧 所属チーム選択肢（互換用 — 既存データを引き継ぐため残す）
 const DEPT_OPTIONS = [
   "経営",
   "営業部",
@@ -1310,12 +1331,44 @@ const DEPT_OPTIONS = [
   "バックオフィス",
 ];
 
+// 新しい 3 階層
+const DIVISION_OPTIONS = ["営業部", "伴走部", "新規事業部", "管理部"];
+const SECTION_OPTIONS = ["営業", "採用代行", "採用DX", "運用", "制作", "ハコプロ", "管理部門"];
+const JOB_OPTIONS = ["営業", "CS", "運用", "ライター", "経理", "人事総務", "プランナー（SDX）", "採用オペ", "ISオペ", "ハコプロ企画"];
+
+// 課 → 職種 の推奨マッピング（参考表示用）
+const SECTION_TO_JOBS = {
+  "営業": ["営業", "CS", "ISオペ"],
+  "採用代行": ["採用オペ"],
+  "採用DX": ["プランナー（SDX）"],
+  "運用": ["運用"],
+  "制作": ["ライター"],
+  "ハコプロ": ["ハコプロ企画"],
+  "管理部門": ["経理", "人事総務"],
+};
+
+// 旧 dept → 新 3階層 への移行マッピング
+const DEPT_MIGRATION = {
+  "経営": { division: "管理部", section: "管理部門", jobType: "" },
+  "営業部": { division: "営業部", section: "", jobType: "" },
+  "営業CS": { division: "営業部", section: "営業", jobType: "CS" },
+  "デジマケ": { division: "新規事業部", section: "採用DX", jobType: "プランナー（SDX）" },
+  "ライター": { division: "伴走部", section: "制作", jobType: "ライター" },
+  "運用": { division: "伴走部", section: "運用", jobType: "運用" },
+  "ハコプロ": { division: "新規事業部", section: "ハコプロ", jobType: "ハコプロ企画" },
+  "インサイドセールス": { division: "営業部", section: "営業", jobType: "ISオペ" },
+  "採用代行": { division: "伴走部", section: "採用代行", jobType: "採用オペ" },
+  "バックオフィス": { division: "管理部", section: "管理部門", jobType: "経理" },
+};
+
 const modalBg = document.getElementById("modalBg");
 const mAvatar = document.getElementById("mAvatar");
 const mName = document.getElementById("mName");
 const mSub = document.getElementById("mSub");
 const mRole = document.getElementById("mRole");
-const mDept = document.getElementById("mDept");
+const mDivision = document.getElementById("mDivision");
+const mSection = document.getElementById("mSection");
+const mJob = document.getElementById("mJob");
 const mParent = document.getElementById("mParent");
 const mStatus = document.getElementById("mStatus");
 const mSave = document.getElementById("mSave");
@@ -1392,9 +1445,11 @@ function openAddMember() {
 
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, "リーダー");
-  // 部署は任意（未設定OK）
-  const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
-  fillSelect(mDept, deptOpts, "");
+  // 3-level organization (all optional)
+  const noneOptAdd = { value: "", label: "（未設定）" };
+  fillSelect(mDivision, [noneOptAdd, ...DIVISION_OPTIONS.map(v => ({ value: v, label: v }))], "");
+  fillSelect(mSection, [noneOptAdd, ...SECTION_OPTIONS.map(v => ({ value: v, label: v }))], "");
+  fillSelect(mJob, [noneOptAdd, ...JOB_OPTIONS.map(v => ({ value: v, label: v }))], "");
   const parentOpts = [{ value: "", label: "（なし）" }];
   const eligible = [];
   for (const k of Object.keys(STATE.byId)) {
@@ -1408,7 +1463,7 @@ function openAddMember() {
   fillSelect(mParent, parentOpts, "");
   mStatus.value = "active";
   // Show all the labels
-  [mDept, mStatus].forEach(s => {
+  [mDivision, mSection, mJob, mStatus].forEach(s => {
     s.style.display = "block";
     const lab = s.previousElementSibling;
     if (lab && lab.tagName === "LABEL") lab.style.display = "block";
@@ -1451,9 +1506,11 @@ function openEditor(id) {
   // role select
   const roleOpts = ROLE_OPTIONS.map(r => ({ value: r, label: r }));
   fillSelect(mRole, roleOpts, d.role);
-  // dept select (任意)
-  const deptOpts = [{ value: "", label: "（未設定）" }, ...DEPT_OPTIONS.map(dd => ({ value: dd, label: dd }))];
-  fillSelect(mDept, deptOpts, d.dept || "");
+  // 3-level organization selects (all optional)
+  const noneOpt = { value: "", label: "（未設定）" };
+  fillSelect(mDivision, [noneOpt, ...DIVISION_OPTIONS.map(v => ({ value: v, label: v }))], d.division || "");
+  fillSelect(mSection, [noneOpt, ...SECTION_OPTIONS.map(v => ({ value: v, label: v }))], d.section || "");
+  fillSelect(mJob, [noneOpt, ...JOB_OPTIONS.map(v => ({ value: v, label: v }))], d.jobType || "");
   // 所属長 select: only リーダー以上 (rank 0-6), exclude self + descendants
   const banned = descendantIds(id);
   banned.add(id);
@@ -1477,7 +1534,9 @@ function openEditor(id) {
     const lab = sel.previousElementSibling;
     if (lab && lab.tagName === "LABEL") lab.style.display = visible ? "block" : "none";
   };
-  setField(mDept, d.kind === "person");
+  setField(mDivision, d.kind === "person");
+  setField(mSection, d.kind === "person");
+  setField(mJob, d.kind === "person");
   setField(mStatus, d.kind === "person");
   if (d.kind === "person") mStatus.value = d.status || "active";
 
@@ -1498,7 +1557,10 @@ mSave.addEventListener("click", () => {
     const newMember = {
       id, kind: "person", name,
       role: mRole.value,
-      dept: mDept.value,
+      division: mDivision.value,
+      section: mSection.value,
+      jobType: mJob.value,
+      dept: "", // legacy, unused going forward
       joined: mJoinedInput.value.trim(),
       birth: mBirthInput.value.trim(),
       parent: mParent.value || null,
@@ -1522,7 +1584,9 @@ mSave.addEventListener("click", () => {
   if (newName) d.name = newName;
   d.role = mRole.value;
   if (d.kind === "person") {
-    d.dept = mDept.value;
+    d.division = mDivision.value;
+    d.section = mSection.value;
+    d.jobType = mJob.value;
     d.status = mStatus.value;
     d.joined = mJoinedInput.value.trim();
     d.birth = mBirthInput.value.trim();
@@ -1618,7 +1682,9 @@ function persist() {
     const n = STATE.byId[id];
     if (id.startsWith("new_")) {
       newMembers.push({
-        id, name: n.name, role: n.role, dept: n.dept,
+        id, name: n.name, role: n.role,
+        division: n.division, section: n.section, jobType: n.jobType,
+        dept: n.dept,
         joined: n.joined, birth: n.birth, parent: n.parent,
         status: n.status, faceSrc: n.faceSrc, kind: n.kind,
         x: n.x, y: n.y,
@@ -1626,7 +1692,9 @@ function persist() {
     } else {
       data[id] = {
         name: n.name,
-        role: n.role, dept: n.dept, parent: n.parent,
+        role: n.role,
+        division: n.division, section: n.section, jobType: n.jobType,
+        dept: n.dept, parent: n.parent,
         status: n.status, x: n.x, y: n.y,
         faceSrc: n.faceSrc, joined: n.joined, birth: n.birth,
       };
@@ -1650,6 +1718,9 @@ function loadPersisted() {
       if (saved.name !== undefined) STATE.byId[id].name = saved.name;
       if (saved.role !== undefined) STATE.byId[id].role = saved.role;
       if (saved.dept !== undefined) STATE.byId[id].dept = saved.dept;
+      if (saved.division !== undefined) STATE.byId[id].division = saved.division;
+      if (saved.section !== undefined) STATE.byId[id].section = saved.section;
+      if (saved.jobType !== undefined) STATE.byId[id].jobType = saved.jobType;
       if (saved.parent !== undefined) STATE.byId[id].parent = saved.parent;
       if (saved.status) STATE.byId[id].status = saved.status;
       if (saved.faceSrc !== undefined) STATE.byId[id].faceSrc = saved.faceSrc;
@@ -1803,7 +1874,9 @@ function renderList() {
   // Build options once
   const banned = new Set(); // for global use - we filter per-row below
   const roleOptionsHTML = ROLE_OPTIONS.map(r => `<option value="${r}">${r}</option>`).join("");
-  const deptOptionsHTML = '<option value="">（未設定）</option>' + DEPT_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
+  const divisionOptionsHTML = '<option value="">（未設定）</option>' + DIVISION_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
+  const sectionOptionsHTML = '<option value="">（未設定）</option>' + SECTION_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
+  const jobOptionsHTML = '<option value="">（未設定）</option>' + JOB_OPTIONS.map(d => `<option value="${d}">${d}</option>`).join("");
   const statusOptionsHTML = `<option value="active">在籍中</option><option value="産休">産休</option><option value="育休">育休</option><option value="休職中">休職中</option>`;
 
   // 所属長 options (only リーダー以上)
@@ -1836,7 +1909,9 @@ function renderList() {
       </td>
       <td class="name-cell"><input type="text" class="cell-input" data-field="name" value="${m.name.replace(/"/g,'&quot;')}" /></td>
       <td><select class="cell-select" data-field="role">${roleOptionsHTML}</select></td>
-      <td><select class="cell-select" data-field="dept">${deptOptionsHTML}</select></td>
+      <td><select class="cell-select" data-field="division">${divisionOptionsHTML}</select></td>
+      <td><select class="cell-select" data-field="section">${sectionOptionsHTML}</select></td>
+      <td><select class="cell-select" data-field="jobType">${jobOptionsHTML}</select></td>
       <td><select class="cell-select" data-field="parent">${parentHTML}</select></td>
       <td class="status-cell"><select class="cell-select" data-field="status">${statusOptionsHTML}</select></td>
       <td class="meta-cell">${m.joined || ""}${m.birth ? "<br>" + m.birth : ""}</td>
@@ -1858,7 +1933,9 @@ function renderList() {
       }
     };
     setSel("role", m.role);
-    setSel("dept", m.dept);
+    setSel("division", m.division || "");
+    setSel("section", m.section || "");
+    setSel("jobType", m.jobType || "");
     setSel("parent", m.parent || "");
     setSel("status", m.status || "active");
 
