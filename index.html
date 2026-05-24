@@ -94,28 +94,11 @@
   }
   .view-toggle button.active { background: var(--accent); color: #fff; }
 
-  /* Admin/readonly states */
-  body.readonly .edit-btn,
-  body.readonly .row-delete,
-  body.readonly #btnAdd,
-  body.readonly #btnAddList,
+  /* Admin permission only restricts snapshot operations. */
+  /* Regular editing (role/dept/parent) is always available. */
   body.readonly .snap-take,
-  body.readonly .snap-delete,
-  body.readonly .snap-export {
+  body.readonly .snap-delete {
     display: none !important;
-  }
-  body.readonly select.cell-select,
-  body.readonly input.cell-input {
-    pointer-events: none;
-    background: #f8fafc;
-    color: var(--sub);
-  }
-  body.readonly .modal select,
-  body.readonly .modal input[type="text"],
-  body.readonly .modal input[type="file"],
-  body.readonly .modal-buttons .btn.primary,
-  body.readonly #mDelete {
-    display: none;
   }
   body.snapshot-view .edit-btn,
   body.snapshot-view .row-delete,
