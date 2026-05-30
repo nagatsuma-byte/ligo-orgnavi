@@ -94,11 +94,215 @@
   }
   .view-toggle button.active { background: var(--accent); color: #fff; }
 
-  /* Admin permission only restricts snapshot operations. */
-  /* Regular editing (role/dept/parent) is always available. */
+  /* 閲覧専用モード（管理者でない時）。編集UIを完全に隠す */
+  body.readonly .edit-btn,
+  body.readonly .row-delete,
+  body.readonly #btnAdd,
+  body.readonly #btnAddList,
   body.readonly .snap-take,
-  body.readonly .snap-delete {
+  body.readonly .snap-delete,
+  body.readonly .snap-export,
+  body.readonly #btnSnapTake,
+  body.readonly #snapImportInput,
+  body.readonly .import-btn,
+  body.readonly #btnReset {
     display: none !important;
+  }
+  body.readonly select.cell-select,
+  body.readonly input.cell-input {
+    pointer-events: none;
+    background: #f8fafc !important;
+    color: var(--ink);
+    border-color: transparent;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+  }
+  body.readonly select.cell-select {
+    background-image: none;
+  }
+  /* Disable dragging cards in readonly */
+  body.readonly .node { cursor: default; }
+  body.readonly .node.dragging { cursor: default; }
+  /* Watermark indicator */
+  body.readonly::after {
+    content: "👁 閲覧モード";
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    background: rgba(15,23,42,.7);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* プレゼンモード: 編集UI/ヒント/グリッド非表示、白背景、ロゴ大きく */
+  body.present .hint,
+  body.present .toolbar,
+  body.present #adminControl,
+  body.present .edit-btn,
+  body.present .view-toggle,
+  body.present .search,
+  body.present body.readonly::after,
+  body.present .rank-band-label {
+    display: none !important;
+  }
+  body.present .canvas-wrap {
+    background-image: none !important;
+    background: #fff;
+  }
+  body.present header {
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  body.present .brand {
+    font-size: 20px;
+  }
+  body.present .brand span {
+    font-size: 14px;
+  }
+  body.present .rank-band {
+    background: rgba(6,182,212,.02);
+    border-top-color: rgba(6,182,212,.1);
+    border-bottom-color: rgba(6,182,212,.1);
+  }
+  body.present .node {
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  /* Self node and ancestor highlight */
+  /* Face lightbox */
+  .face-lightbox {
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,.75);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 2000;
+    cursor: zoom-out;
+  }
+  .face-lightbox.show { display: flex; }
+  .face-lightbox .face-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 24px 32px 28px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    max-width: 90vw;
+    cursor: default;
+    animation: faceIn .2s ease;
+  }
+  @keyframes faceIn {
+    from { opacity: 0; transform: scale(.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .face-lightbox .face-img {
+    width: 360px; height: 360px;
+    max-width: 70vw; max-height: 70vh;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--accent-soft);
+    display: grid; place-items: center;
+    color: var(--accent-dark);
+    font-size: 120px;
+    font-weight: 700;
+    overflow: hidden;
+  }
+  .face-lightbox .face-img img { width: 100%; height: 100%; object-fit: cover; }
+  .face-lightbox .face-name {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .face-lightbox .face-role {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--accent-dark);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 3px 10px;
+    margin-bottom: 10px;
+  }
+  .face-lightbox .face-meta {
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.6;
+  }
+  .face-lightbox .face-close {
+    position: absolute; top: 18px; right: 18px;
+    background: rgba(255,255,255,.95);
+    border: 0; width: 36px; height: 36px;
+    border-radius: 50%; cursor: pointer;
+    font-size: 18px;
+  }
+  .avatar { cursor: zoom-in; }
+  body.readonly .avatar { cursor: zoom-in; }
+
+  /* Comparison modal */
+  .compare-modal {
+    width: 980px; max-width: 95vw;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .compare-selectors {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+  }
+  .compare-selectors label { margin: 0 0 4px; }
+  .diff-summary {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 14px;
+  }
+  .diff-pill {
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 12px;
+  }
+  .diff-pill .num { display: block; font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+  .diff-pill.added { background: #dcfce7; color: #166534; }
+  .diff-pill.removed { background: #fee2e2; color: #991b1b; }
+  .diff-pill.changed { background: #fef3c7; color: #92400e; }
+  .diff-pill.same { background: #f1f5f9; color: var(--sub); }
+  .diff-section { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .diff-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .diff-table th, .diff-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+  .diff-table th { background: var(--bg); color: var(--sub); font-weight: 600; }
+  .diff-table .diff-old { color: var(--sub); text-decoration: line-through; }
+  .diff-table .diff-new { color: var(--accent-dark); font-weight: 600; }
+
+  .node.self {
+    box-shadow: 0 0 0 3px #f97316, 0 4px 12px rgba(249,115,22,.35) !important;
+    border-color: #f97316 !important;
+    animation: selfPulse 2s ease-in-out infinite;
+  }
+  @keyframes selfPulse {
+    0%, 100% { box-shadow: 0 0 0 3px #f97316, 0 4px 12px rgba(249,115,22,.35); }
+    50% { box-shadow: 0 0 0 6px rgba(249,115,22,.2), 0 4px 16px rgba(249,115,22,.45); }
+  }
+  .node.ancestor {
+    box-shadow: 0 0 0 2px #fbbf24, 0 4px 12px rgba(251,191,36,.25);
+    border-color: #fbbf24 !important;
+  }
+  body.present::after {
+    content: "▶ プレゼン  [P]で解除";
+    position: fixed;
+    right: 16px;
+    top: 16px;
+    background: rgba(15,23,42,.55);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 50;
   }
   body.snapshot-view .edit-btn,
   body.snapshot-view .row-delete,
@@ -457,6 +661,26 @@
     min-height: 56px;
     display: flex; flex-direction: column; justify-content: center;
   }
+  /* 部門ごとのアクセントカラー */
+  .node.div-営業部       { border-top: 4px solid #06b6d4; }
+  .node.div-伴走部       { border-top: 4px solid #8b5cf6; }
+  .node.div-新規事業部   { border-top: 4px solid #f59e0b; }
+  .node.div-管理部       { border-top: 4px solid #10b981; }
+  .node.dept-rect.div-営業部     { background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%); }
+  .node.dept-rect.div-伴走部     { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); }
+  .node.dept-rect.div-新規事業部 { background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); }
+  .node.dept-rect.div-管理部     { background: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+  .legend {
+    display: flex; gap: 10px; align-items: center;
+    font-size: 11px; color: var(--sub);
+    margin-left: 6px;
+  }
+  .legend .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .legend .swatch {
+    width: 14px; height: 4px; border-radius: 2px;
+  }
   .node.dept-rect .dept-title { font-size: 13px; font-weight: 700; text-align: center; }
   .node.dept-rect .dept-sub { font-size: 10px; text-align: center; opacity: .85; margin-top: 2px; }
   .status-badge {
@@ -612,6 +836,14 @@
       <button class="btn primary" id="btnAdd">＋新規メンバー</button>
       <button class="btn" id="btnFit">全体表示</button>
       <button class="btn" id="btnReset">レイアウト初期化</button>
+      <button class="btn" id="btnPresent" title="プレゼンモード（Pキーで切替）">▶ プレゼン</button>
+      <button class="btn" id="btnMyCard" title="自分のカードにジャンプ">👤 マイカード</button>
+      <div class="legend" title="部門カラー">
+        <span class="chip"><span class="swatch" style="background:#06b6d4"></span>営業</span>
+        <span class="chip"><span class="swatch" style="background:#8b5cf6"></span>伴走</span>
+        <span class="chip"><span class="swatch" style="background:#f59e0b"></span>新規</span>
+        <span class="chip"><span class="swatch" style="background:#10b981"></span>管理</span>
+      </div>
     </div>
     <div class="toolbar" id="zoomTools">
       <button class="btn" id="btnZoomOut">－</button>
@@ -647,6 +879,7 @@
         📥 JSON読込
         <input type="file" id="snapImportInput" accept="application/json" style="display:none;" />
       </label>
+      <button class="btn" id="btnCompare">🔀 2案を比較</button>
     </div>
     <div class="snap-list" id="snapList"></div>
   </div>
@@ -654,6 +887,11 @@
   <div class="list-wrap hide" id="listWrap">
     <div class="list-toolbar">
       <button class="btn primary" id="btnAddList">＋新規メンバー</button>
+      <button class="btn" id="btnCsvExport">📤 CSV書き出し</button>
+      <label class="btn import-btn" style="cursor:pointer;">
+        📥 CSV読込
+        <input type="file" id="csvImportInput" accept=".csv,text/csv" style="display:none;" />
+      </label>
       <select class="filter" id="lfDept"><option value="">すべての部署</option></select>
       <select class="filter" id="lfStatus">
         <option value="">すべてのステータス</option>
@@ -681,6 +919,51 @@
       </thead>
       <tbody></tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal-bg" id="compareModalBg">
+  <div class="modal compare-modal" role="dialog" aria-modal="true">
+    <h3>🔀 組織図を比較</h3>
+    <div class="modal-sub">2つの組織図（現在 or 履歴）を比較して差分を確認できます</div>
+    <div class="compare-selectors">
+      <div>
+        <label>A（基準）</label>
+        <select id="cmpA"></select>
+      </div>
+      <div>
+        <label>B（比較対象）</label>
+        <select id="cmpB"></select>
+      </div>
+    </div>
+    <div id="cmpResult"></div>
+    <div class="modal-buttons">
+      <button class="btn" id="cmpClose">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="face-lightbox" id="faceLightbox">
+  <button class="face-close" id="faceClose" aria-label="閉じる">✕</button>
+  <div class="face-card">
+    <div class="face-img" id="faceImg"></div>
+    <div class="face-name" id="faceName"></div>
+    <div class="face-role" id="faceRole"></div>
+    <div class="face-meta" id="faceMeta"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="myCardModalBg">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>👤 マイカードを設定</h3>
+    <div class="modal-sub">あなた自身を選んでください。次回以降「マイカード」ボタンで自分中心ビューに切り替えできます。</div>
+    <label>あなた</label>
+    <select id="mySelect"></select>
+    <div class="modal-buttons">
+      <button class="btn" id="myClear">設定解除</button>
+      <button class="btn" id="myCancel">キャンセル</button>
+      <button class="btn primary" id="mySave">保存</button>
+    </div>
   </div>
 </div>
 
@@ -1103,7 +1386,13 @@ function render() {
   // nodes
   for (const d of Object.values(STATE.byId)) {
     const el = document.createElement("div");
-    el.className = "node" + (d.kind === "dept" ? " dept-rect" : "");
+    let cls = "node";
+    if (d.kind === "dept") cls += " dept-rect";
+    // Division color class for persons; dept boxes derive from their name match
+    let divName = d.kind === "person" ? (d.division || "") : "";
+    if (d.kind === "dept" && DIVISION_OPTIONS.includes(d.name)) divName = d.name;
+    if (divName) cls += " div-" + divName;
+    el.className = cls;
     el.dataset.id = d.id;
     if (d.kind === "person") {
       const avStyle = `background:${avatarColor(d.name)};color:${avatarInk(d.name)};`;
@@ -1144,6 +1433,7 @@ function render() {
   }
   drawLines();
   updateBounds();
+  if (typeof applySelfHighlight === "function") applySelfHighlight();
 }
 
 function drawLines() {
@@ -1185,6 +1475,8 @@ function attachDrag(el, d) {
   el.addEventListener("pointerdown", e => {
     // Don't drag when clicking edit button
     if (e.target.closest(".edit-btn")) return;
+    // Don't drag in readonly mode
+    if (document.body.classList.contains("readonly")) return;
     e.stopPropagation();
     dragging = true;
     el.classList.add("dragging");
@@ -2267,6 +2559,143 @@ document.getElementById("snapSave").addEventListener("click", () => {
   snapModalBg.classList.remove("show");
 });
 
+// ===== CSV Export / Import =====
+const CSV_HEADERS = ["id", "name", "role", "division", "section", "jobType", "parent_name", "status", "joined", "birth"];
+
+function csvEscape(v) {
+  if (v == null) return "";
+  const s = String(v);
+  if (s.includes(",") || s.includes("\n") || s.includes('"')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function exportCSV() {
+  const rows = [CSV_HEADERS.join(",")];
+  for (const d of Object.values(STATE.byId)) {
+    if (d.kind !== "person") continue;
+    const parentName = d.parent && STATE.byId[d.parent] ? STATE.byId[d.parent].name : "";
+    rows.push([
+      d.id, d.name, d.role || "",
+      d.division || "", d.section || "", d.jobType || "",
+      parentName, d.status || "active",
+      d.joined || "", d.birth || "",
+    ].map(csvEscape).join(","));
+  }
+  const csv = "﻿" + rows.join("\n"); // UTF-8 BOM for Excel
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `orgnavi-members-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function parseCSV(text) {
+  // simple CSV parser supporting quoted fields with commas and escaped quotes
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  text = text.replace(/^﻿/, ""); // strip BOM
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQuotes = false;
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); rows.push(row); row = []; field = "";
+      }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r.length === 1 && r[0].trim()));
+}
+
+function importCSV(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) { alert("CSVデータが空です"); return; }
+  const headers = rows[0].map(h => h.trim());
+  const idx = Object.fromEntries(CSV_HEADERS.map(h => [h, headers.indexOf(h)]));
+  // 必須列チェック
+  if (idx.name < 0) { alert('必須列 "name" がありません'); return; }
+  const nameToId = {};
+  for (const d of Object.values(STATE.byId)) if (d.kind === "person") nameToId[d.name] = d.id;
+  let added = 0, updated = 0;
+  // 1st pass: create / update entries (without parent linking)
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const get = key => idx[key] >= 0 ? (r[idx[key]] || "").trim() : "";
+    const name = get("name");
+    if (!name) continue;
+    let id = get("id");
+    let existing = id && STATE.byId[id] ? STATE.byId[id] : STATE.byId[nameToId[name]];
+    if (existing) {
+      existing.name = name;
+      existing.role = get("role") || existing.role;
+      existing.division = get("division") || "";
+      existing.section = get("section") || "";
+      existing.jobType = get("jobType") || "";
+      existing.status = get("status") || existing.status || "active";
+      existing.joined = get("joined") || existing.joined || "";
+      existing.birth = get("birth") || existing.birth || "";
+      updated++;
+    } else {
+      const newId = "new_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + "_" + i;
+      STATE.byId[newId] = {
+        id: newId, kind: "person",
+        name, role: get("role") || "メンバー",
+        division: get("division"), section: get("section"), jobType: get("jobType"),
+        dept: "",
+        status: get("status") || "active",
+        joined: get("joined"), birth: get("birth"),
+        parent: null, faceSrc: null, face: null, children: [],
+      };
+      nameToId[name] = newId;
+      added++;
+    }
+  }
+  // 2nd pass: link parents by name
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const get = key => idx[key] >= 0 ? (r[idx[key]] || "").trim() : "";
+    const name = get("name");
+    const parentName = get("parent_name");
+    const meId = nameToId[name];
+    if (!meId) continue;
+    if (parentName) {
+      const pid = nameToId[parentName];
+      if (pid) STATE.byId[meId].parent = pid;
+    } else {
+      STATE.byId[meId].parent = null;
+    }
+  }
+  rebuildTree();
+  autoLayout(STATE.roots);
+  render();
+  persist();
+  renderList();
+  alert(`CSV読込完了：追加 ${added}名 / 更新 ${updated}名`);
+}
+
+document.getElementById("btnCsvExport").addEventListener("click", exportCSV);
+document.getElementById("csvImportInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm(`「${file.name}」を取り込みます。\n同じ名前のメンバーは上書き、新規はそのまま追加されます。続行しますか？`)) {
+    e.target.value = ""; return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => { importCSV(reader.result); e.target.value = ""; };
+  reader.readAsText(file, "UTF-8");
+});
+
 // ===== Extended view switcher with history =====
 const historyWrap = document.getElementById("historyWrap");
 const vHistoryBtn = document.getElementById("vHistory");
@@ -2286,6 +2715,305 @@ switchView = function(view) {
 vChartBtn.addEventListener("click", () => switchView("chart"));
 vListBtn.addEventListener("click", () => switchView("list"));
 vHistoryBtn.addEventListener("click", () => switchView("history"));
+
+// ===== Comparison =====
+function buildSnapshotMembers(stateBlock) {
+  // Reconstruct the member list from a snapshot state block (data + newMembers + deleted)
+  const members = {};
+  // Original DATA
+  for (const d of DATA) {
+    if (d.kind !== "person") continue;
+    members[d.id] = {
+      id: d.id, name: d.name,
+      role: d.role, division: d.division || "", section: d.section || "", jobType: d.jobType || "",
+      parent: d.parent, status: "active", joined: d.joined, birth: d.birth,
+    };
+    // Apply legacy dept migration
+    if (d.dept && DEPT_MIGRATION[d.dept]) {
+      const mig = DEPT_MIGRATION[d.dept];
+      members[d.id].division = members[d.id].division || mig.division;
+      members[d.id].section = members[d.id].section || mig.section;
+      members[d.id].jobType = members[d.id].jobType || mig.jobType;
+    }
+  }
+  // Apply snapshot overrides
+  const data = stateBlock.data || {};
+  const newMembers = stateBlock.newMembers || [];
+  const deleted = stateBlock.deleted || [];
+  for (const id of Object.keys(data)) {
+    if (!members[id]) continue;
+    Object.assign(members[id], data[id]);
+  }
+  for (const m of newMembers) {
+    members[m.id] = { ...m };
+  }
+  for (const id of deleted) delete members[id];
+  return members;
+}
+
+function getCurrentMembers() {
+  const out = {};
+  for (const d of Object.values(STATE.byId)) {
+    if (d.kind !== "person") continue;
+    out[d.id] = {
+      id: d.id, name: d.name, role: d.role,
+      division: d.division || "", section: d.section || "", jobType: d.jobType || "",
+      parent: d.parent, status: d.status || "active",
+      joined: d.joined, birth: d.birth,
+    };
+  }
+  return out;
+}
+
+function diffMembers(A, B, ids) {
+  const idToName = id => (A[id] && A[id].name) || (B[id] && B[id].name) || id;
+  const added = [], removed = [], changed = [], same = [];
+  for (const id of ids) {
+    const a = A[id], b = B[id];
+    if (!a && b) { added.push(b); continue; }
+    if (a && !b) { removed.push(a); continue; }
+    if (!a && !b) continue;
+    const diffs = [];
+    const compareKeys = [
+      ["name", "名前"], ["role", "役職"], ["division", "部門"],
+      ["section", "課"], ["jobType", "職種"], ["status", "ステータス"],
+      ["parent", "所属長"],
+    ];
+    for (const [k, label] of compareKeys) {
+      const av = a[k] || "", bv = b[k] || "";
+      if (av !== bv) {
+        const fmt = v => k === "parent" ? (v ? idToName(v) : "（なし）") : (v || "（未設定）");
+        diffs.push({ key: k, label, before: fmt(av), after: fmt(bv) });
+      }
+    }
+    if (diffs.length) changed.push({ ...b, diffs });
+    else same.push(b);
+  }
+  return { added, removed, changed, same };
+}
+
+function renderDiffResult(A, B) {
+  const allIds = new Set([...Object.keys(A), ...Object.keys(B)]);
+  const { added, removed, changed, same } = diffMembers(A, B, allIds);
+  let html = `
+    <div class="diff-summary">
+      <div class="diff-pill added"><span class="num">${added.length}</span>新規/追加</div>
+      <div class="diff-pill removed"><span class="num">${removed.length}</span>退職/削除</div>
+      <div class="diff-pill changed"><span class="num">${changed.length}</span>変更</div>
+      <div class="diff-pill same"><span class="num">${same.length}</span>不変</div>
+    </div>
+  `;
+  const idToName = id => (A[id] && A[id].name) || (B[id] && B[id].name) || "";
+  if (added.length) {
+    html += `<div class="diff-section">🆕 新規 / 追加</div><table class="diff-table"><thead><tr><th>名前</th><th>役職</th><th>部門/課/職種</th></tr></thead><tbody>`;
+    for (const m of added) {
+      html += `<tr><td>${m.name}</td><td>${m.role || ""}</td><td>${[m.division, m.section, m.jobType].filter(Boolean).join(" / ")}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  if (removed.length) {
+    html += `<div class="diff-section">👋 退職 / 削除</div><table class="diff-table"><thead><tr><th>名前</th><th>役職</th><th>部門/課/職種</th></tr></thead><tbody>`;
+    for (const m of removed) {
+      html += `<tr><td>${m.name}</td><td>${m.role || ""}</td><td>${[m.division, m.section, m.jobType].filter(Boolean).join(" / ")}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  if (changed.length) {
+    html += `<div class="diff-section">🔄 変更（役職・所属など）</div><table class="diff-table"><thead><tr><th>名前</th><th>項目</th><th>変更</th></tr></thead><tbody>`;
+    for (const m of changed) {
+      for (const df of m.diffs) {
+        html += `<tr><td>${m.name}</td><td>${df.label}</td><td><span class="diff-old">${df.before}</span> → <span class="diff-new">${df.after}</span></td></tr>`;
+      }
+    }
+    html += `</tbody></table>`;
+  }
+  return html;
+}
+
+const compareModalBg = document.getElementById("compareModalBg");
+function openCompareModal() {
+  const snaps = getSnapshots();
+  const opts = [`<option value="__current__">📍 現在の組織図</option>`,
+    ...snaps.map(s => `<option value="${s.id}">${s.type === "future" ? "🔮" : "📌"} ${s.title}（${new Date(s.timestamp).toLocaleDateString("ja-JP")}）</option>`)];
+  document.getElementById("cmpA").innerHTML = opts.join("");
+  document.getElementById("cmpB").innerHTML = opts.join("");
+  if (snaps.length) document.getElementById("cmpB").value = snaps[0].id;
+  compareModalBg.classList.add("show");
+  runCompare();
+}
+
+function runCompare() {
+  const av = document.getElementById("cmpA").value;
+  const bv = document.getElementById("cmpB").value;
+  const fetchMembers = key => {
+    if (key === "__current__") return getCurrentMembers();
+    const s = getSnapshots().find(x => x.id === key);
+    if (!s) return {};
+    return buildSnapshotMembers(s.state);
+  };
+  const A = fetchMembers(av);
+  const B = fetchMembers(bv);
+  document.getElementById("cmpResult").innerHTML = renderDiffResult(A, B);
+}
+
+document.getElementById("cmpClose").addEventListener("click", () => compareModalBg.classList.remove("show"));
+compareModalBg.addEventListener("click", e => { if (e.target === compareModalBg) compareModalBg.classList.remove("show"); });
+document.getElementById("cmpA").addEventListener("change", runCompare);
+document.getElementById("cmpB").addEventListener("change", runCompare);
+document.getElementById("btnCompare").addEventListener("click", openCompareModal);
+
+// ===== Face lightbox =====
+const faceLightbox = document.getElementById("faceLightbox");
+function openFaceLightbox(id) {
+  const d = STATE.byId[id];
+  if (!d || d.kind !== "person") return;
+  const img = document.getElementById("faceImg");
+  const src = faceImgSrc(d.id);
+  img.style.backgroundImage = `url("${src}")`;
+  img.textContent = ""; // clear fallback initial
+  // Fallback: detect if image fails by attempting Image preload
+  const probe = new Image();
+  probe.onerror = () => {
+    img.style.backgroundImage = "none";
+    img.textContent = d.name[0];
+  };
+  probe.src = src;
+  // If person uses faceSrc (data URI uploaded), use that
+  if (d.faceSrc) img.style.backgroundImage = `url("${d.faceSrc}")`;
+  document.getElementById("faceName").textContent = d.name;
+  document.getElementById("faceRole").textContent = d.role || "";
+  const metaParts = [];
+  if (d.division) metaParts.push(d.division);
+  if (d.section) metaParts.push(d.section);
+  if (d.jobType) metaParts.push(d.jobType);
+  const team = metaParts.join(" / ");
+  const meta = [];
+  if (team) meta.push(team);
+  if (d.parent && STATE.byId[d.parent]) meta.push(`所属長：${STATE.byId[d.parent].name}`);
+  if (d.joined) meta.push(d.joined);
+  if (d.birth) meta.push(d.birth);
+  document.getElementById("faceMeta").innerHTML = meta.join("<br>");
+  faceLightbox.classList.add("show");
+}
+function closeFaceLightbox() { faceLightbox.classList.remove("show"); }
+document.getElementById("faceClose").addEventListener("click", closeFaceLightbox);
+faceLightbox.addEventListener("click", e => {
+  if (e.target === faceLightbox) closeFaceLightbox();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && faceLightbox.classList.contains("show")) closeFaceLightbox();
+});
+
+// Click handler on avatars (delegated on canvas)
+canvas.addEventListener("click", e => {
+  const av = e.target.closest(".avatar");
+  if (!av) return;
+  const card = av.closest(".node");
+  if (!card) return;
+  e.stopPropagation();
+  openFaceLightbox(card.dataset.id);
+});
+
+// ===== マイカード =====
+const MYCARD_KEY = "orgnavi_my_id_v1";
+function getMyId() { return localStorage.getItem(MYCARD_KEY) || ""; }
+function setMyId(id) { if (id) localStorage.setItem(MYCARD_KEY, id); else localStorage.removeItem(MYCARD_KEY); }
+
+function getAncestors(id) {
+  const out = new Set();
+  let cur = STATE.byId[id];
+  while (cur && cur.parent && STATE.byId[cur.parent]) {
+    cur = STATE.byId[cur.parent];
+    out.add(cur.id);
+  }
+  return out;
+}
+
+function applySelfHighlight() {
+  const myId = getMyId();
+  STATE.nodeEls.forEach(el => { el.classList.remove("self"); el.classList.remove("ancestor"); });
+  if (!myId) return;
+  const selfEl = STATE.nodeEls.get(myId);
+  if (selfEl) selfEl.classList.add("self");
+  for (const aid of getAncestors(myId)) {
+    const e = STATE.nodeEls.get(aid);
+    if (e) e.classList.add("ancestor");
+  }
+}
+
+function focusOnMyCard() {
+  const myId = getMyId();
+  if (!myId) { openMyCardSelector(); return; }
+  const d = STATE.byId[myId];
+  if (!d) {
+    alert("登録した本人の情報が見つかりません。再度設定してください。");
+    setMyId("");
+    openMyCardSelector();
+    return;
+  }
+  // Switch to chart view
+  if (typeof switchView === "function") switchView("chart");
+  // Center the chart on this person's location
+  const wrap = canvasWrap.getBoundingClientRect();
+  STATE.scale = 1.0;
+  STATE.tx = wrap.width / 2 - (d.x + NODE_W / 2) * STATE.scale;
+  STATE.ty = wrap.height / 2 - (d.y + nodeHeight(d) / 2) * STATE.scale;
+  applyTransform();
+  applySelfHighlight();
+}
+
+const myCardModalBg = document.getElementById("myCardModalBg");
+function openMyCardSelector() {
+  const sel = document.getElementById("mySelect");
+  sel.innerHTML = '<option value="">（選択してください）</option>';
+  const persons = Object.values(STATE.byId).filter(d => d.kind === "person")
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  for (const p of persons) {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name}（${p.role}）`;
+    if (p.id === getMyId()) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  myCardModalBg.classList.add("show");
+}
+
+document.getElementById("btnMyCard").addEventListener("click", () => {
+  if (getMyId()) focusOnMyCard();
+  else openMyCardSelector();
+});
+document.getElementById("myCancel").addEventListener("click", () => myCardModalBg.classList.remove("show"));
+document.getElementById("myClear").addEventListener("click", () => {
+  setMyId("");
+  applySelfHighlight();
+  myCardModalBg.classList.remove("show");
+});
+document.getElementById("mySave").addEventListener("click", () => {
+  const v = document.getElementById("mySelect").value;
+  if (!v) { alert("自分を選んでください"); return; }
+  setMyId(v);
+  myCardModalBg.classList.remove("show");
+  focusOnMyCard();
+});
+myCardModalBg.addEventListener("click", e => { if (e.target === myCardModalBg) myCardModalBg.classList.remove("show"); });
+
+// ===== Presentation mode =====
+function togglePresent() {
+  document.body.classList.toggle("present");
+  // refit chart when entering/exiting
+  setTimeout(fitToView, 50);
+}
+document.getElementById("btnPresent").addEventListener("click", togglePresent);
+document.addEventListener("keydown", e => {
+  // Don't trigger if user is typing in input/textarea/select
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === "p" || e.key === "P") {
+    togglePresent();
+  }
+  if (e.key === "Escape" && document.body.classList.contains("present")) {
+    togglePresent();
+  }
+});
 
 updateAdminUI();
 initWithPersist();
